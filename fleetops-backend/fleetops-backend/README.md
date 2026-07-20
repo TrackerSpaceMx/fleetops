@@ -70,9 +70,9 @@ cp .env .env.local                 # editar si es necesario
 El archivo `.env` ya viene con las credenciales de Fulltrack:
 
 ```env
-FULLTRACK_BASE_URL=https://ws.fulltrack2.com
-FULLTRACK_APIKEY=8f2db8b3617c91d0a2627b081954c356cb5365b5
-FULLTRACK_SECRETKEY=43a13914411d588461d5277a827791e3ce028fa4
+FULLTRACK_BASE_URL=
+FULLTRACK_APIKEY=
+FULLTRACK_SECRETKEY=4
 DIESEL_PRICE_PER_LITER=23.62
 FLEET_POLL_INTERVAL=30
 KM_POLL_INTERVAL=300
