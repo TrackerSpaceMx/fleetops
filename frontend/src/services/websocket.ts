@@ -76,7 +76,7 @@ export type BasculaPorUnidad = {
 
 export const connectFuelSocket = (onMessage: (data: FuelStats) => void): WebSocket => {
   const socket = new WebSocket('wss://fleetops-space.com.mx/ws/fuel');
-  socket.onopen = () => console.log('🟢 WebSocket conectado (fuel)');
+  socket.onopen = () => {};
   socket.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
@@ -105,7 +105,7 @@ export const connectFuelSocket = (onMessage: (data: FuelStats) => void): WebSock
     }
   };
   socket.onerror = (e) => console.error('🔥 WS error (fuel):', e);
-  socket.onclose = () => console.log('🔴 WebSocket cerrado (fuel)');
+  socket.onclose = () => {};
   return socket;
 };
 
@@ -117,7 +117,7 @@ export const connectFleetSocket = (
   onBasculaUpdate?: (data: { toneladas_hoy: number; viajes_hoy: number }) => void,
 ): WebSocket => {
   const socket = new WebSocket('wss://fleetops-space.com.mx/ws/fleet');
-  socket.onopen = () => console.log('🟢 WebSocket conectado (fleet)');
+  socket.onopen = () => {};
   socket.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
@@ -162,7 +162,7 @@ export const connectFleetSocket = (
     }
   };
   socket.onerror = (e) => console.error('🔥 WS error (fleet):', e);
-  socket.onclose = () => console.log('🔴 WebSocket cerrado (fleet)');
+  socket.onclose = () => {};
   return socket;
 };
 

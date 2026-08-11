@@ -46,6 +46,7 @@ function AppShell() {
 function AuthenticatedApp() {
   const [activePage, setActivePage]           = useState('dashboard');
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | undefined>();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const pageTitles: Record<string, string> = {
     dashboard:    'Mission Control',
@@ -67,9 +68,14 @@ function AuthenticatedApp() {
   return (
     <div className="flex h-screen w-full bg-surface overflow-hidden font-sans">
       <Toaster position="bottom-right" richColors />
-      <Sidebar activePage={activePage} setActivePage={setActivePage} />
+      <Sidebar
+        activePage={activePage}
+        setActivePage={setActivePage}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
+      />
 
-      <div className="flex-1 flex flex-col ml-64 h-full relative">
+      <div className={`flex-1 flex flex-col h-full relative transition-all duration-200 ${sidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
         <TopBar title={pageTitles[activePage] || 'Dashboard'} />
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden">

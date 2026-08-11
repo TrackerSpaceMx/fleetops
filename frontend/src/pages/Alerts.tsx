@@ -85,7 +85,7 @@ export function Alerts() {
   useEffect(() => {
     const socket = new WebSocket('wss://fleetops-space.com.mx/ws/alerts');
 
-    socket.onopen = () => console.log('🟢 WS alertas conectado');
+    socket.onopen = () => {};
 
     socket.onmessage = (event) => {
       try {
@@ -119,7 +119,7 @@ export function Alerts() {
     };
 
     socket.onerror = (e) => console.error('🔥 WS alerts error:', e);
-    socket.onclose = () => console.log('🔴 WS alertas cerrado');
+    socket.onclose = () => {};
 
     wsRef.current = socket;
     return () => socket.close();
