@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   Clock,
-  MapPin,
   Activity,
   Fuel,
   Scale,
-  History,
   Eye,
   ChevronRight,
   X,
@@ -13,6 +11,7 @@ import {
   Loader2,
   RefreshCw,
 } from 'lucide-react';
+import { authFetch } from '../lib/auth';
 import {
   LineChart,
   Line,
@@ -25,7 +24,7 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const API = 'http://localhost:8000';
+const API = 'https://fleetops-space.com.mx';
 
 // Paleta de colores para cada vehículo en la gráfica
 const VEHICLE_COLORS = [
@@ -166,7 +165,7 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
     try {
       setTicketLoading(true);
       const key = rawUrl.split('.amazonaws.com/')[1];
-      const res = await fetch(`${API}/api/fuel/ticket-url?key=${encodeURIComponent(key)}`);
+      const res = await authFetch(`${API}/api/fuel/ticket-url?key=${encodeURIComponent(key)}`);
       if (!res.ok) throw new Error('no presigned');
       const data = await res.json();
       setTicketUrl(data.url);
@@ -179,7 +178,7 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
 
 //mapa de placas
   useEffect(() => {
-    fetch(`${API}/api/fleet/vehicles`)
+    authFetch(`${API}/api/fleet/vehicles`)
       .then(r => r.json())
       .then((data: any) => {
         // El endpoint puede devolver el array directo o dentro de una propiedad
@@ -205,7 +204,7 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
       ? `${API}/api/fuel/records/${vehicleId}`
       : `${API}/api/fuel/records`;
 
-    fetch(endpoint)
+    authFetch(endpoint)
       .then((r) => r.json())
       .then((data) => {
         if (data.records) {
@@ -228,7 +227,7 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
     if (activeTab !== 'operatividad' || !vehicleId) return;
     setRendimientoLoading(true);
 
-    fetch(`${API}/api/fleet/rendimiento-historico/${encodeURIComponent(vehicleId)}`)
+    authFetch(`${API}/api/fleet/rendimiento-historico/${encodeURIComponent(vehicleId)}`)
       .then(r => r.json())
       .then(data => {
         // Espera: { meses: [{ periodo, year, month, toneladas, km_total, km_prod, km_trasl, km_por_litro, diesel_lts }] }
@@ -243,7 +242,7 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
     if (activeTab !== 'operatividad') return;
     setChartLoading(true);
 
-    fetch(`${API}/api/fuel/records`)
+    authFetch(`${API}/api/fuel/records`)
       .then(r => r.json())
       .then(data => {
         const byUnit: Record<string, any> = data.by_unit || {};
@@ -290,7 +289,7 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
     if (showLoader) setBasculaLoading(true);
     try {
       // Trae todos los registros de hoy y filtra por el eco de este vehículo
-      const res = await fetch(`${API}/api/bascula/actividad?limit=500`);
+      const res = await authFetch(`${API}/api/bascula/actividad?limit=500`);
       if (!res.ok) throw new Error('Error al cargar báscula');
       const data = await res.json();
       const registros: any[] = data.registros ?? [];
@@ -332,7 +331,6 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
     { id: 'operatividad', label: 'Operatividad', icon: Activity },
     { id: 'combustible',  label: 'Combustible',  icon: Fuel     },
     { id: 'bascula',      label: 'Báscula',       icon: Scale    },
-    { id: 'historial',    label: 'Historial',     icon: History  }
   ];
 
   return (
@@ -344,47 +342,6 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
         <span>Flota</span>
         <ChevronRight className="w-4 h-4" />
         <span className="text-gray-900 font-medium">{vehicleId || 'TM-04'}</span>
-      </div>
-
-      {/* Hero Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div className="flex items-center gap-6">
-            <div className="w-20 h-20 bg-navy-500 rounded-xl flex items-center justify-center text-white text-2xl font-bold shadow-inner">
-              {vehicleId || 'TM-04'}
-            </div>
-            <div>
-              <div className="flex items-center gap-3 mb-1">
-                <h1 className="text-2xl font-bold text-gray-900">Unidad Recolectora</h1>
-                <span className="px-2.5 py-1 rounded-full bg-success/10 text-success text-xs font-bold">ACTIVO</span>
-              </div>
-              <div className="flex items-center gap-4 text-sm text-gray-500">
-                <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> Ruta Norte</span>
-                <span className="font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-700">ABC-1234</span>
-                <span>Kenworth T370 (2021)</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-4">
-            <div className="bg-gray-50 px-4 py-3 rounded-lg border border-gray-100 text-center min-w-[100px]">
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Horas Hoy</p>
-              <p className="text-xl font-bold text-gray-900 font-mono tabular-nums">6.5<span className="text-sm text-gray-400 font-sans">h</span></p>
-            </div>
-            <div className="bg-gray-50 px-4 py-3 rounded-lg border border-gray-100 text-center min-w-[100px]">
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">KM Hoy</p>
-              <p className="text-xl font-bold text-gray-900 font-mono tabular-nums">142</p>
-            </div>
-            <div className="bg-gray-50 px-4 py-3 rounded-lg border border-gray-100 text-center min-w-[100px]">
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Tons Hoy</p>
-              <p className="text-xl font-bold text-gray-900 font-mono tabular-nums">18.4</p>
-            </div>
-            <div className="bg-gray-50 px-4 py-3 rounded-lg border border-gray-100 text-center min-w-[100px]">
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Lts Hoy</p>
-              <p className="text-xl font-bold text-gray-900 font-mono tabular-nums">45</p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Tabs */}
@@ -968,15 +925,6 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
                   );
                 })()}
               </div>
-            </motion.div>
-          )}
-
-          {/* ── HISTORIAL ────────────────────────────────────────────────── */}
-          {activeTab === 'historial' && (
-            <motion.div key="historial" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }} className="flex flex-col items-center justify-center py-20 text-gray-400">
-              <History className="w-12 h-12 mb-4 text-gray-300" />
-              <p className="text-lg font-medium text-gray-600">No hay datos para este período</p>
-              <p className="text-sm">El historial detallado de eventos estará disponible pronto.</p>
             </motion.div>
           )}
 

@@ -6,22 +6,28 @@ import sys
 from contextlib import asynccontextmanager
 from datetime import date
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from src.routes.pdf_routes import router as pdf_router
 
-from src.config.settings import HOST, PORT, FRONTEND_ORIGIN
+from src.config.settings import (
+    HOST, PORT, FRONTEND_ORIGIN,
+    DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD, DEFAULT_ADMIN_NOMBRE,
+)
 from src.routes.fleet_routes   import router as fleet_router
 from src.routes.export_routes import router as export_router
 from src.routes.fuel_routes    import router as fuel_router
 from src.routes.report_routes  import router as report_router
 from src.routes.bascula_routes import router as bascula_router
+from src.routes.auth_routes    import router as auth_router
 from src.routes.ws_routes      import router as ws_router
 from src.websocket.scheduler   import start_scheduler, stop_scheduler
 from src.websocket.ws_manager  import manager as ws_manager
-from src.database              import db_service
-from src.services              import state_store
+from src.database              import db_service, user_service
+from src.services               import state_store
+from src.services.auth_service  import decode_access_token, hash_password
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,6 +49,25 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Tabla metrics_snapshot verificada")
     except Exception as e:
         logger.error("❌ Error creando metrics_snapshot: %s", e)
+
+    # ── 0.b Verificar/crear tabla de usuarios + sembrar admin por defecto ──
+    try:
+        await user_service.ensure_users_table()
+        if await user_service.count_users() == 0:
+            await user_service.create_user(
+                username=DEFAULT_ADMIN_USERNAME,
+                nombre=DEFAULT_ADMIN_NOMBRE,
+                password_hash=hash_password(DEFAULT_ADMIN_PASSWORD),
+                rol="admin",
+            )
+            logger.warning(
+                "⚠️  Usuario admin creado automáticamente → usuario: '%s' / contraseña: '%s'. "
+                "¡Cámbiala en cuanto inicies sesión!",
+                DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD,
+            )
+        logger.info("✅ Tabla usuarios verificada")
+    except Exception as e:
+        logger.error("❌ Error creando/sembrando tabla usuarios: %s", e)
 
     # ── 1. Cargar fuel_records del mes actual desde MySQL ─────────────────
     today = date.today()
@@ -107,6 +132,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ─── Middleware de autenticación ──────────────────────────────────────────────
+# Protege todas las rutas /api/* con un JWT válido, excepto /api/auth/login
+# (para poder loguearse). Los canales WebSocket (/ws/*) no pasan por este
+# middleware — ver nota de seguridad en el README.
+_PUBLIC_API_PATHS = {"/api/auth/login"}
+
+
+@app.middleware("http")
+async def require_auth_for_api(request: Request, call_next):
+    path = request.url.path
+    if request.method != "OPTIONS" and path.startswith("/api/") and path not in _PUBLIC_API_PATHS:
+        auth_header = request.headers.get("authorization", "")
+        if not auth_header.lower().startswith("bearer "):
+            return JSONResponse(status_code=401, content={"detail": "No autenticado"})
+        token = auth_header.split(" ", 1)[1].strip()
+        try:
+            decode_access_token(token)
+        except Exception:
+            return JSONResponse(status_code=401, content={"detail": "Token inválido o expirado"})
+    return await call_next(request)
+
+
 app.include_router(ws_router)
 app.include_router(export_router)
 app.include_router(fleet_router)
@@ -114,6 +161,7 @@ app.include_router(fuel_router)
 app.include_router(report_router)
 app.include_router(bascula_router)
 app.include_router(pdf_router)
+app.include_router(auth_router)
 
 
 @app.get("/health", tags=["Sistema"])

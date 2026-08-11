@@ -22,6 +22,7 @@ import {
   type BasculaPorUnidad,
   type BascularRecord,
 } from '@/services/websocket';
+import { authFetch } from '../lib/auth';
 
 const MESES_NOMBRE = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
@@ -161,7 +162,7 @@ export function Dashboard() {
     }
     Promise.all(
       meses.map(({ year, month }) =>
-        fetch(`http://localhost:8000/api/reports/top3-consumo?year=${year}&month=${month}`)
+        authFetch(`https://fleetops-space.com.mx/api/reports/top3-consumo?year=${year}&month=${month}`)
           .then(r => r.json()).catch(() => ({ top3: [] }))
       )
     ).then(results => {

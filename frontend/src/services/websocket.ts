@@ -1,3 +1,5 @@
+import { authFetch } from '../lib/auth';
+
 export type FuelRecord = {
   id: string;
   vehicle_id: string;
@@ -73,7 +75,7 @@ export type BasculaPorUnidad = {
 // ── WebSocket: combustible ────────────────────────────────────────────────────
 
 export const connectFuelSocket = (onMessage: (data: FuelStats) => void): WebSocket => {
-  const socket = new WebSocket('ws://localhost:8000/ws/fuel');
+  const socket = new WebSocket('wss://fleetops-space.com.mx/ws/fuel');
   socket.onopen = () => console.log('🟢 WebSocket conectado (fuel)');
   socket.onmessage = (event) => {
     try {
@@ -114,7 +116,7 @@ export const connectFleetSocket = (
   // Callback opcional: cuando llega un bascula_update por WS de alertas
   onBasculaUpdate?: (data: { toneladas_hoy: number; viajes_hoy: number }) => void,
 ): WebSocket => {
-  const socket = new WebSocket('ws://localhost:8000/ws/fleet');
+  const socket = new WebSocket('wss://fleetops-space.com.mx/ws/fleet');
   socket.onopen = () => console.log('🟢 WebSocket conectado (fleet)');
   socket.onmessage = (event) => {
     try {
@@ -166,22 +168,22 @@ export const connectFleetSocket = (
 
 // ── REST helpers: báscula ─────────────────────────────────────────────────────
 
-const API = 'http://localhost:8000';
+const API = 'https://fleetops-space.com.mx';
 
 export async function fetchBasculaHoy(): Promise<BasculaHoy> {
-  const r = await fetch(`${API}/api/bascula/hoy`);
+  const r = await authFetch(`${API}/api/bascula/hoy`);
   if (!r.ok) throw new Error('Error GET /api/bascula/hoy');
   return r.json();
 }
 
 export async function fetchBasculaAyer(): Promise<BasculaHoy> {
-  const r = await fetch(`${API}/api/bascula/ayer`);
+  const r = await authFetch(`${API}/api/bascula/ayer`);
   if (!r.ok) return { fecha: '', toneladas: 0, viajes: 0 }; // sin datos de ayer → no romper
   return r.json();
 }
 
 export async function fetchTonelajeDiario(dias = 30): Promise<TonelajeDiarioPoint[]> {
-  const r = await fetch(`${API}/api/bascula/diario?dias=${dias}`);
+  const r = await authFetch(`${API}/api/bascula/diario?dias=${dias}`);
   if (!r.ok) throw new Error('Error GET /api/bascula/diario');
   const data = await r.json();
   // Mapear para el gráfico: fecha ISO → número de día
@@ -197,14 +199,14 @@ export async function fetchBasculaPorUnidad(fecha?: string): Promise<BasculaPorU
   const url = fecha
     ? `${API}/api/bascula/por-unidad?target_date=${fecha}`
     : `${API}/api/bascula/por-unidad`;
-  const r = await fetch(url);
+  const r = await authFetch(url);
   if (!r.ok) throw new Error('Error GET /api/bascula/por-unidad');
   const data = await r.json();
   return data.unidades ?? [];
 }
 
 export async function fetchBasculaActividad(limit = 50): Promise<BascularRecord[]> {
-  const r = await fetch(`${API}/api/bascula/actividad?limit=${limit}`);
+  const r = await authFetch(`${API}/api/bascula/actividad?limit=${limit}`);
   if (!r.ok) throw new Error('Error GET /api/bascula/actividad');
   const data = await r.json();
   return data.registros ?? [];

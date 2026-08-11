@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { Bell, Search, ChevronDown } from 'lucide-react';
 interface TopBarProps {
   title: string;
 }
@@ -41,31 +40,6 @@ export function TopBar({ title }: TopBarProps) {
           <span className="text-xs text-gray-500 capitalize">
             {formattedDate}
           </span>
-        </div>
-
-        <div className="h-8 w-px bg-gray-200"></div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-4">
-          <button className="text-gray-400 hover:text-gray-600 transition-colors">
-            <Search className="w-5 h-5" />
-          </button>
-
-          <button className="relative text-gray-400 hover:text-gray-600 transition-colors">
-            <Bell className="w-5 h-5" />
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-danger text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white">
-              3
-            </span>
-          </button>
-
-          <button className="flex items-center gap-2 hover:bg-gray-50 p-1 pr-2 rounded-full transition-colors border border-transparent hover:border-gray-200">
-            <img
-              src="https://i.pravatar.cc/150?u=admin"
-              alt="User avatar"
-              className="w-8 h-8 rounded-full border border-gray-200" />
-            
-            <ChevronDown className="w-4 h-4 text-gray-500" />
-          </button>
         </div>
       </div>
     </header>);

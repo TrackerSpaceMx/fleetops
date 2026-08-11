@@ -82,6 +82,22 @@ TURNOS = {
     "nocturno":  {"inicio": "22:00", "fin": "06:00"},
 }
 
+# ── Autenticación (JWT) ──────────────────────────────────────────────────────
+# IMPORTANTE: define JWT_SECRET en tu .env en producción (una cadena larga y
+# aleatoria). Si no está definida, se genera una al vuelo SOLO para que el
+# server no truene en desarrollo — pero eso invalida las sesiones activas
+# cada vez que reinicies el proceso.
+import secrets as _secrets
+JWT_SECRET = os.getenv("JWT_SECRET") or _secrets.token_hex(32)
+JWT_ALGORITHM        = "HS256"
+JWT_EXPIRE_HOURS      = int(os.getenv("JWT_EXPIRE_HOURS", "12"))
+
+# Usuario admin sembrado automáticamente si la tabla `usuarios` está vacía.
+# Cambia la contraseña en el primer login desde Configuración.
+DEFAULT_ADMIN_USERNAME = os.getenv("DEFAULT_ADMIN_USERNAME", "admin")
+DEFAULT_ADMIN_PASSWORD = os.getenv("DEFAULT_ADMIN_PASSWORD", "TersaMundi2026!")
+DEFAULT_ADMIN_NOMBRE   = os.getenv("DEFAULT_ADMIN_NOMBRE", "Administrador")
+
 AWS_ACCESS_KEY_ID     = os.getenv("AWS_ACCESS_KEY_ID", "")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "")
 AWS_REGION            = os.getenv("AWS_REGION", "us-east-1")

@@ -106,18 +106,10 @@ async def force_refresh():
     return {"status": "ok", "units_updated": len(payload.get("units", []))}
 
 
-# src/routes/fleet_routes.py  (agregar este endpoint al archivo existente)
-# ─────────────────────────────────────────────────────────────────────────────
 # GET /api/fleet/rendimiento-historico/{vehicle_id}
 # Devuelve las métricas de los últimos 3 meses para un vehículo.
 # Usado por la tabla "Rendimiento Mensual" en VehicleDetail → pestaña Operatividad.
 # ─────────────────────────────────────────────────────────────────────────────
-
-from fastapi import APIRouter
-from src.services import fleet_service
-
-router = APIRouter(prefix="/api/fleet", tags=["fleet"])
-
 
 @router.get("/rendimiento-historico/{vehicle_id}")
 async def get_rendimiento_historico(vehicle_id: str):

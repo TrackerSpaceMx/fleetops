@@ -7,8 +7,43 @@ import { FuelRegistration } from './pages/FuelRegistration';
 import { VehicleDetail } from './pages/VehicleDetail';
 import { Alerts } from './pages/Alerts';
 import Reports from './pages/Reports';
+import { Bascula } from './pages/Bascula';
+import { Configuracion } from './pages/Configuracion';
+import { Login } from './pages/Login';
+import { AuthProvider, useAuth } from './lib/auth';
 
 export function App() {
+  return (
+    <AuthProvider>
+      <AppShell />
+    </AuthProvider>
+  );
+}
+
+function AppShell() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-surface text-gray-400">
+        Cargando…
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <>
+        <Toaster position="bottom-right" richColors />
+        <Login />
+      </>
+    );
+  }
+
+  return <AuthenticatedApp />;
+}
+
+function AuthenticatedApp() {
   const [activePage, setActivePage]           = useState('dashboard');
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | undefined>();
 
@@ -18,7 +53,6 @@ export function App() {
     combustible:  'Control de Combustible',
     'nueva-carga':'Nueva Carga de Combustible',
     bascula:      'Registro de Báscula',
-    rutas:        'Monitoreo de Rutas',
     reportes:     'Generador de Reportes',
     alertas:      'Centro de Alertas',
     configuracion:'Configuración del Sistema',
@@ -51,6 +85,10 @@ export function App() {
             <Alerts />
           ) : activePage === 'reportes' ? (
             <Reports />
+          ) : activePage === 'bascula' ? (
+            <Bascula />
+          ) : activePage === 'configuracion' ? (
+            <Configuracion />
           ) : (
             <div className="flex items-center justify-center h-full text-gray-400 flex-col gap-4">
               <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-2">

@@ -70,14 +70,32 @@ cp .env .env.local                 # editar si es necesario
 El archivo `.env` ya viene con las credenciales de Fulltrack:
 
 ```env
-FULLTRACK_BASE_URL=
-FULLTRACK_APIKEY=
-FULLTRACK_SECRETKEY=4
+FULLTRACK_BASE_URL=https://ws.fulltrack2.com
+FULLTRACK_APIKEY=tu_api_key_de_fulltrack
+FULLTRACK_SECRETKEY=tu_secret_key_de_fulltrack
 DIESEL_PRICE_PER_LITER=23.62
 FLEET_POLL_INTERVAL=30
 KM_POLL_INTERVAL=300
 FRONTEND_ORIGIN=http://localhost:3000
+
+# MySQL (ajusta a tus datos reales)
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASS=tu_contraseña_mysql
+DB_NAME=fleetops
+
+# Autenticación — genera un valor largo y aleatorio, ej: openssl rand -hex 32
+# IMPORTANTE: si lo dejas vacío, tu sesión se cierra sola cada vez que el
+# servidor se reinicia (--reload lo hace seguido). Ponle un valor fijo.
+JWT_SECRET=pega_aqui_un_valor_largo_y_aleatorio
+JWT_EXPIRE_HOURS=12
+DEFAULT_ADMIN_USERNAME=admin
+DEFAULT_ADMIN_PASSWORD=CambiaEstaContraseñaAlPrimerLogin!
+DEFAULT_ADMIN_NOMBRE=Administrador
 ```
+
+> ⚠️ **Nunca pongas tus credenciales reales en este README ni en ningún archivo que subas a git.** Van solo en tu `.env` local, que ya está en `.gitignore`.
 
 ---
 

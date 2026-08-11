@@ -7,8 +7,9 @@ import {
   Truck, Scale, Fuel, ChevronDown, ChevronUp, RefreshCw,
   Calendar,
 } from 'lucide-react'
+import { authFetch } from '../lib/auth'
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = 'https://fleetops-space.com.mx'
 const EMPRESA  = 'Tersa Mundi S.A. de C.V.'
 const SISTEMA  = 'FleetOps'
 
@@ -210,36 +211,67 @@ function drawPDFFooter(doc: jsPDF, W: number, page: number, total: number) {
   doc.text(`Página ${page} de ${total}  ·  ${SISTEMA}`, W - m, y, { align: 'right' })
 }
 
-function insertBarChart(doc: jsPDF, rows: any[], labelKey: string, valueKey: string, chartTitle: string, startY: number, W: number): number {
-  const m = 14; const cW = W - 2 * m; const cH = 50
+const CHART_MAX_BARS = 15 // barras por gráfica — más que esto se vuelve ilegible
+
+function drawSingleBarChart(doc: jsPDF, valid: any[], labelKey: string, valueKey: string, chartTitle: string, startY: number, W: number): number {
+  const m = 14; const cW = W - 2 * m; const cH = 62
   const canvas = document.createElement('canvas')
   const S = 3; canvas.width = cW * S * 3.7795; canvas.height = cH * S * 3.7795
   const ctx = canvas.getContext('2d')!; ctx.scale(S, S)
   const pw = cW * 3.7795; const ph = cH * 3.7795
   ctx.fillStyle = '#EFF6FF'; ctx.fillRect(0, 0, pw, ph)
-  const valid = rows.filter(r => r[valueKey] != null && !isNaN(parseFloat(r[valueKey])))
-  if (!valid.length) return startY
   const vals = valid.map(r => parseFloat(r[valueKey]))
   const labels = valid.map(r => String(r[labelKey] ?? ''))
   const maxVal = Math.max(...vals, 1)
-  const ba = { x: 38, y: 18, w: pw - 55, h: ph - 44 }
-  const gap = ba.w / labels.length; const bw = Math.min(38, gap * 0.65)
-  ctx.fillStyle = '#1E3A5F'; ctx.font = 'bold 10px Arial'; ctx.fillText(chartTitle, 6, 13)
+  const ba = { x: 40, y: 20, w: pw - 60, h: ph - 60 }
+  const gap = ba.w / labels.length; const bw = Math.min(46, gap * 0.55)
+  ctx.fillStyle = '#1E3A5F'; ctx.font = 'bold 11px Arial'; ctx.fillText(chartTitle, 6, 14)
   labels.forEach((label, i) => {
     const v = vals[i]; const bh = maxVal > 0 ? (v / maxVal) * ba.h : 0
     const x = ba.x + i * gap + gap / 2 - bw / 2; const y = ba.y + ba.h - bh
-    ctx.fillStyle = `rgba(37,99,235,${0.6 + (i / labels.length) * 0.4})`
+    ctx.fillStyle = `rgba(37,99,235,${0.65 + (i / Math.max(labels.length, 1)) * 0.35})`
     ctx.beginPath(); ctx.roundRect(x, y, bw, bh, [3, 3, 0, 0]); ctx.fill()
-    ctx.fillStyle = '#1E3A5F'; ctx.font = '8px Arial'; ctx.textAlign = 'center'
+    ctx.fillStyle = '#1E3A5F'; ctx.font = 'bold 9px Arial'; ctx.textAlign = 'center'
     const disp = v > 9999 ? `${(v/1000).toFixed(1)}k` : v.toFixed(v < 10 ? 2 : 0)
-    ctx.fillText(disp, x + bw / 2, y - 3)
-    ctx.fillStyle = '#6B7280'; ctx.font = '7px Arial'
-    ctx.fillText(label.length > 6 ? label.slice(0, 5) + '…' : label, x + bw / 2, ba.y + ba.h + 12)
+    ctx.fillText(disp, x + bw / 2, y - 4)
+    // Etiqueta rotada para que quepa completa aunque el nombre sea largo
+    ctx.save()
+    ctx.translate(x + bw / 2, ba.y + ba.h + 8)
+    ctx.rotate(-Math.PI / 5)
+    ctx.fillStyle = '#374151'; ctx.font = '8.5px Arial'; ctx.textAlign = 'right'
+    ctx.fillText(label.length > 16 ? label.slice(0, 15) + '…' : label, 0, 0)
+    ctx.restore()
   })
   ctx.strokeStyle = '#DBEAFE'; ctx.lineWidth = 0.5
   ctx.beginPath(); ctx.moveTo(ba.x, ba.y); ctx.lineTo(ba.x, ba.y + ba.h); ctx.stroke()
   doc.addImage(canvas.toDataURL('image/png'), 'PNG', m, startY, cW, cH)
-  return startY + cH + 4
+  return startY + cH + 5
+}
+
+/**
+ * Divide los datos en varias gráficas legibles (máx. CHART_MAX_BARS por gráfica)
+ * en vez de meter cientos de barras en una sola imagen ilegible. Ordena de mayor
+ * a menor para que lo más relevante quede primero, y salta de página cuando ya
+ * no cabe otra gráfica.
+ */
+function insertBarChart(doc: jsPDF, rows: any[], labelKey: string, valueKey: string, chartTitle: string, startY: number, W: number): number {
+  const valid = rows.filter(r => r[valueKey] != null && !isNaN(parseFloat(r[valueKey])) && r[labelKey])
+  if (!valid.length) return startY
+
+  const sorted = [...valid].sort((a, b) => parseFloat(b[valueKey]) - parseFloat(a[valueKey]))
+  const chunks: any[][] = []
+  for (let i = 0; i < sorted.length; i += CHART_MAX_BARS) chunks.push(sorted.slice(i, i + CHART_MAX_BARS))
+
+  const pageH = doc.internal.pageSize.getHeight()
+  let y = startY
+
+  chunks.forEach((chunk, idx) => {
+    const title = chunks.length > 1 ? `${chartTitle} — top ${idx * CHART_MAX_BARS + 1}-${idx * CHART_MAX_BARS + chunk.length} de ${sorted.length}` : chartTitle
+    if (y + 62 + 10 > pageH - 15) { doc.addPage(); y = 16 }
+    y = drawSingleBarChart(doc, chunk, labelKey, valueKey, title, y, W)
+  })
+
+  return y
 }
 
 function generateClientPDF(rows: any[], cols: string[], title: string, period: string, chartKey: string | null, withChart: boolean) {
@@ -300,7 +332,7 @@ export default function Reports() {
 
   // Vehículos
   useEffect(() => {
-    fetch(`${API_BASE}/api/fleet/vehicles`)
+    authFetch(`${API_BASE}/api/fleet/vehicles`)
       .then(r => { if (!r.ok) throw new Error('404'); return r.json() })
       .then(data => {
         const ecos = (data.vehicles ?? [])
@@ -348,7 +380,7 @@ export default function Reports() {
     setLoadingPreview(true); setError('')
     try {
       const url  = `${API_BASE}${selectedReport.endpoint}?${buildParams()}`
-      const resp = await fetch(url)
+      const resp = await authFetch(url)
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
       const data = await resp.json()
       let rows: any[] = []
@@ -416,7 +448,7 @@ export default function Reports() {
       const unitsParam = selectedUnits.filter(u => u !== 'TODAS').join(',')
       const ep         = format === 'Excel' ? 'excel' : 'csv'
       const url        = `${API_BASE}/api/export/${ep}?report=${reportId}&year=${year}&month=${month}${unitsParam ? `&units=${unitsParam}` : ''}`
-      const resp = await fetch(url)
+      const resp = await authFetch(url)
       if (!resp.ok) throw new Error((await resp.text()) || `HTTP ${resp.status}`)
       const blob = await resp.blob()
       const a = document.createElement('a')

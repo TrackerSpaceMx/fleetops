@@ -51,6 +51,14 @@ async def upload_ticket(
     unique_name = f"{uuid.uuid4().hex}{ext}"
     s3_key = f"tickets/{now.year}/{now.month:02d}/{vehicle_id}/{unique_name}"
 
+    if not AWS_S3_BUCKET or not AWS_ACCESS_KEY_ID or not AWS_SECRET_ACCESS_KEY:
+        logger.error("❌ S3: faltan variables de entorno (AWS_S3_BUCKET / AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)")
+        raise RuntimeError(
+            "El almacenamiento de fotos (AWS S3) no está configurado en el servidor. "
+            "Agrega AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY y AWS_S3_BUCKET a tu .env, "
+            "o registra la carga sin foto."
+        )
+
     try:
         s3 = _get_s3_client()
         s3.put_object(
@@ -69,6 +77,12 @@ async def upload_ticket(
     except ClientError as e:
         logger.error("❌ S3 ClientError: %s", e)
         raise RuntimeError(f"Error S3: {e.response['Error']['Message']}")
+    except Exception as e:
+        # Cubre errores no anticipados (ej. bucket con nombre inválido, región mal
+        # configurada, etc.) para que el endpoint responda con un mensaje claro
+        # en vez de un 500 genérico.
+        logger.error("❌ Error inesperado subiendo a S3: %s", e)
+        raise RuntimeError(f"No se pudo subir el archivo: {e}")
 
 
 def _safe_extension(filename: str) -> str:

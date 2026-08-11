@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { ChevronRight, UploadCloud, Check, X, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import { authFetch } from '../lib/auth';
 
-const API = 'http://localhost:8000';
+const API = 'https://fleetops-space.com.mx';
 
 export function FuelRegistration() {
   const [formData, setFormData] = useState({
@@ -38,6 +39,8 @@ export function FuelRegistration() {
   const [ticketUrl, setTicketUrl] = useState<string>('');
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [vehiclesLoading, setVehiclesLoading] = useState(true);
+  const [manualUnidad, setManualUnidad] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -50,13 +53,21 @@ export function FuelRegistration() {
 
   useEffect(() => {
     const fetchVehicles = async () => {
+      setVehiclesLoading(true);
       try {
-        const res = await fetch(`${API}/api/fleet/vehicles`);
+        const res = await authFetch(`${API}/api/fleet/vehicles`);
         const data = await res.json();
-        setVehicles(data.vehicles || []);
+        const list = data.vehicles || [];
+        setVehicles(list);
+        // Si no llegó ninguna unidad desde el GPS (ej. Fulltrack sin credenciales
+        // válidas), activamos automáticamente el modo manual para no bloquear el registro.
+        if (list.length === 0) setManualUnidad(true);
       } catch (error) {
         console.error('Error cargando vehículos:', error);
-        toast.error('Error al cargar vehículos');
+        toast.error('No se pudo cargar la lista de unidades desde el GPS. Puedes escribir la unidad manualmente.');
+        setManualUnidad(true);
+      } finally {
+        setVehiclesLoading(false);
       }
     };
     fetchVehicles();
@@ -92,6 +103,8 @@ export function FuelRegistration() {
       let fotoUrl = ticketUrl;
 
       // 1️⃣ Subir ticket a S3 si hay archivo y no se subió aún
+      // Si falla (ej. S3 no configurado en el servidor), no bloqueamos el
+      // registro de la carga — avisamos y seguimos guardando sin foto.
       if (file && !fotoUrl) {
         setUploading(true);
         try {
@@ -99,7 +112,7 @@ export function FuelRegistration() {
           formPayload.append('vehicle_id', formData.unidad);
           formPayload.append('file', file);
 
-          const uploadRes = await fetch(`${API}/api/fuel/upload-ticket`, {
+          const uploadRes = await authFetch(`${API}/api/fuel/upload-ticket`, {
             method: 'POST',
             body: formPayload,
           });
@@ -112,13 +125,21 @@ export function FuelRegistration() {
           const uploadData = await uploadRes.json();
           fotoUrl = uploadData.url;
           setTicketUrl(fotoUrl);
+        } catch (uploadError: any) {
+          console.error(uploadError);
+          toast.warning(
+            uploadError.message?.includes('S3')
+              ? 'No se pudo subir la foto (almacenamiento no configurado). Se guardará la carga sin foto.'
+              : 'No se pudo subir la foto del ticket. Se guardará la carga sin foto.'
+          );
+          fotoUrl = '';
         } finally {
           setUploading(false);
         }
       }
 
       // 2️⃣ Registrar la carga con la URL del ticket
-      await fetch(`${API}/api/fuel/load`, {
+      await authFetch(`${API}/api/fuel/load`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -183,27 +204,59 @@ export function FuelRegistration() {
           {/* Left Column */}
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                Unidad
-              </label>
-              <select
-                className={`w-full p-3 rounded-lg border ${errors.unidad ? 'border-danger bg-danger/5' : 'border-gray-200'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                value={formData.unidad}
-                onChange={(e) => {
-                  const vehicleId = e.target.value;
-                  const vehicle = vehicles.find((v) => v.ras_vei_id === vehicleId);
-                  setSelectedVehicle(vehicle);
-                  setFormData({ ...formData, unidad: vehicleId, conductor: vehicle?.ras_mot_nome || '' });
-                  setLastOdometer(Number(vehicle?.ras_eve_hodometro || 0));
-                }}
-              >
-                <option value="">Seleccionar unidad...</option>
-                {vehicles.map((v) => (
-                  <option key={v.ras_vei_id} value={v.ras_vei_id}>
-                    {v.ras_vei_placa}
-                  </option>
-                ))}
-              </select>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                  Unidad
+                </label>
+                {vehicles.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setManualUnidad((v) => !v)}
+                    className="text-xs font-medium text-blue-500 hover:text-blue-600"
+                  >
+                    {manualUnidad ? 'Elegir de la lista' : '¿No aparece tu unidad? Escríbela'}
+                  </button>
+                )}
+              </div>
+
+              {vehiclesLoading ? (
+                <div className="w-full p-3 rounded-lg border border-gray-200 text-sm text-gray-400 flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Cargando unidades…
+                </div>
+              ) : manualUnidad ? (
+                <input
+                  type="text"
+                  placeholder="Ej. TM-04"
+                  className={`w-full p-3 rounded-lg border ${errors.unidad ? 'border-danger bg-danger/5' : 'border-gray-200'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  value={formData.unidad}
+                  onChange={(e) => setFormData({ ...formData, unidad: e.target.value })}
+                />
+              ) : (
+                <select
+                  className={`w-full p-3 rounded-lg border ${errors.unidad ? 'border-danger bg-danger/5' : 'border-gray-200'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  value={formData.unidad}
+                  onChange={(e) => {
+                    const vehicleId = e.target.value;
+                    const vehicle = vehicles.find((v) => v.ras_vei_id === vehicleId);
+                    setSelectedVehicle(vehicle);
+                    setFormData({ ...formData, unidad: vehicleId, conductor: vehicle?.ras_mot_nome || '' });
+                    setLastOdometer(Number(vehicle?.ras_eve_hodometro || 0));
+                  }}
+                >
+                  <option value="">Seleccionar unidad...</option>
+                  {vehicles.map((v) => (
+                    <option key={v.ras_vei_id} value={v.ras_vei_id}>
+                      {v.ras_vei_placa}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {vehicles.length === 0 && !vehiclesLoading && (
+                <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" /> No se pudo obtener la lista de unidades desde el GPS (Fulltrack). Escribe el número económico manualmente.
+                </p>
+              )}
               {errors.unidad && (
                 <p className="text-danger text-xs mt-1 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3" /> Requerido

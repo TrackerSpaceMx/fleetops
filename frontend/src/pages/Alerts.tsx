@@ -83,7 +83,7 @@ export function Alerts() {
 
   // ── Conectar al canal /ws/alerts ──────────────────────────────────────────
   useEffect(() => {
-    const socket = new WebSocket('ws://localhost:8000/ws/alerts');
+    const socket = new WebSocket('wss://fleetops-space.com.mx/ws/alerts');
 
     socket.onopen = () => console.log('🟢 WS alertas conectado');
 

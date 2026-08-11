@@ -4,16 +4,25 @@ import {
   Truck,
   Fuel,
   Scale,
-  Map as MapIcon,
   BarChart3,
   Bell,
-  Settings } from
+  Settings,
+  LogOut } from
 'lucide-react';
+import { useAuth } from '../lib/auth';
 interface SidebarProps {
   activePage: string;
   setActivePage: (page: string) => void;
 }
 export function Sidebar({ activePage, setActivePage }: SidebarProps) {
+  const { user, logout } = useAuth();
+  const initials = (user?.nombre || user?.username || '??')
+    .split(' ')
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
   const navItems = [
   {
     id: 'dashboard',
@@ -34,11 +43,6 @@ export function Sidebar({ activePage, setActivePage }: SidebarProps) {
     id: 'bascula',
     label: 'Báscula',
     icon: Scale
-  },
-  {
-    id: 'rutas',
-    label: 'Rutas',
-    icon: MapIcon
   },
   {
     id: 'reportes',
@@ -103,16 +107,25 @@ export function Sidebar({ activePage, setActivePage }: SidebarProps) {
 
       {/* User Profile */}
       <div className="p-4 border-t border-navy-400/30">
-        <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-navy-400/20 cursor-pointer transition-colors">
-          <div className="w-9 h-9 rounded-full bg-navy-400 flex items-center justify-center text-sm font-bold border border-navy-400/50">
-            OP
+        <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-navy-400/20 transition-colors group">
+          <div className="w-9 h-9 rounded-full bg-navy-400 flex items-center justify-center text-sm font-bold border border-navy-400/50 shrink-0">
+            {initials}
           </div>
-          <div className="flex flex-col text-left">
-            <span className="text-sm font-semibold text-white">
-              Operador Central
+          <div className="flex flex-col text-left min-w-0 flex-1">
+            <span className="text-sm font-semibold text-white truncate">
+              {user?.nombre || user?.username}
             </span>
-            <span className="text-xs text-blue-300">Turno Matutino</span>
+            <span className="text-xs text-blue-300 capitalize">
+              {user?.rol === 'admin' ? 'Administrador' : 'Operador'}
+            </span>
           </div>
+          <button
+            onClick={logout}
+            title="Cerrar sesión"
+            className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-blue-300 hover:text-white hover:bg-danger/80 transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </aside>);
