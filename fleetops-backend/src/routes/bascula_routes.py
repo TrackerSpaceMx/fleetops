@@ -57,10 +57,31 @@ class PesajeBatch(BaseModel):
 
 # ─── Helper: normalizar registro de la API externa ───────────────────────────
 
+def _shift_hour(fecha: date, hora_str: str, delta_hours: int) -> tuple[date, str]:
+    """
+    Ajusta una hora "HH:MM:SS" por delta_hours (puede ser negativo), corrigiendo
+    la fecha si el ajuste cruza la medianoche.
+    """
+    if not hora_str:
+        return fecha, hora_str
+    try:
+        parts = [int(p) for p in hora_str.split(":")]
+        while len(parts) < 3:
+            parts.append(0)
+        h, mi, s = parts[:3]
+        dt = datetime.combine(fecha, datetime.min.time().replace(hour=h, minute=mi, second=s)) + timedelta(hours=delta_hours)
+        return dt.date(), dt.strftime("%H:%M:%S")
+    except Exception:
+        return fecha, hora_str
+
+
 def _normalize_api_record(r: dict) -> dict | None:
     """
     Convierte el dict crudo de la API externa a formato interno.
     Fecha viene como "14/MAY/2026" → date.
+
+    La API de báscula reporta en UTC-5; se ajusta -1 hora para mostrar
+    la hora real de Ciudad de México (UTC-6, sin horario de verano desde 2022).
     """
     import re
     MESES = {
@@ -78,13 +99,19 @@ def _normalize_api_record(r: dict) -> dict | None:
             # Intentar ISO
             fecha = date.fromisoformat(str(raw_fecha)[:10])
 
+        # Ajuste de zona horaria: API en UTC-5 → CDMX (UTC-6) = restar 1 hora.
+        # hora_entrada define la fecha del registro (si cruza medianoche al
+        # restar, la fecha del registro se corrige junto con la hora).
+        fecha, hora_entrada = _shift_hour(fecha, r.get("hora_entrada", ""), -1)
+        _, hora_salida = _shift_hour(fecha, r.get("hora_salida", ""), -1)
+
         return {
             "folio":         r.get("folio"),
             "placa":         r.get("placa", ""),
             "num_eco":       r.get("num_eco", r.get("placa", "")),
             "fecha":         fecha,
-            "hora_entrada":  r.get("hora_entrada", ""),
-            "hora_salida":   r.get("hora_salida", ""),
+            "hora_entrada":  hora_entrada,
+            "hora_salida":   hora_salida,
             "peso_entrada":  float(r.get("peso_entrada") or 0),
             "peso_salida":   float(r.get("peso_salida") or 0),
             "peso_neto":     float(r.get("peso_neto") or 0),
