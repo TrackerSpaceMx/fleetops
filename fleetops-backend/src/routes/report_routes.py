@@ -150,6 +150,18 @@ async def reporte_km_rendimiento(
     vehicles = state_store.get_vehicles()
     rows = []
 
+    # Meses pasados: los registros ya no viven en memoria (state_store solo
+    # carga el mes actual al arrancar), así que se consultan directo en MySQL.
+    is_current = (y == today.year and m == today.month) and not is_range
+    fuel_by_vehicle: dict[str, list[dict]] = {}
+    if not is_current:
+        try:
+            month_records = await db_service.get_fuel_records_by_month(y, m)
+        except Exception:
+            month_records = []
+        for r in month_records:
+            fuel_by_vehicle.setdefault(str(r.get("vehicle_id", "")), []).append(r)
+
     for v in vehicles:
         vid = str(v.get("ras_vei_id", ""))
         eco = v.get("ras_vei_eco") or v.get("ras_vei_placa") or vid
@@ -165,7 +177,7 @@ async def reporte_km_rendimiento(
             km_total = state_store.get_km_month(vid) or 0.0
 
         # Litros en el rango desde fuel_records
-        all_fuel   = state_store.get_fuel_records_for_vehicle(vid)
+        all_fuel   = state_store.get_fuel_records_for_vehicle(vid) if is_current else fuel_by_vehicle.get(vid, [])
         range_recs = [r for r in all_fuel if _record_in_range(r, _df, _dt)]
         litros     = round(sum(r.get("liters", 0) for r in range_recs), 2)
 
@@ -236,15 +248,27 @@ async def reporte_costo_combustible(
     """
     _df, _dt, y, m = _resolve_range(year, month, date_from, date_to)
     today = _date.today()
+    is_current = (y == today.year and m == today.month) and not (date_from or date_to)
 
     vehicles = state_store.get_vehicles()
     rows, detail_rows = [], []
+
+    # Meses pasados: los registros ya no viven en memoria (state_store solo
+    # carga el mes actual al arrancar), así que se consultan directo en MySQL.
+    fuel_by_vehicle: dict[str, list[dict]] = {}
+    if not is_current:
+        try:
+            month_records = await db_service.get_fuel_records_by_month(y, m)
+        except Exception:
+            month_records = []
+        for r in month_records:
+            fuel_by_vehicle.setdefault(str(r.get("vehicle_id", "")), []).append(r)
 
     for v in vehicles:
         vid = str(v.get("ras_vei_id", ""))
         eco = v.get("ras_vei_eco") or v.get("ras_vei_placa") or vid
 
-        all_fuel   = state_store.get_fuel_records_for_vehicle(vid)
+        all_fuel   = fuel_by_vehicle.get(vid, []) if not is_current else state_store.get_fuel_records_for_vehicle(vid)
         range_recs = [r for r in all_fuel if _record_in_range(r, _df, _dt)]
 
         if not range_recs:

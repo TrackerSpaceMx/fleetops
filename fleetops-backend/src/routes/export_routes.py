@@ -32,6 +32,7 @@ from openpyxl.styles import (
 from openpyxl.utils import get_column_letter
 
 from src.services import state_store
+from src.database import db_service
 from src.routes.report_routes import _current, _get_all_unit_metrics
 
 router = APIRouter(prefix="/api/export", tags=["Exportación"])
@@ -411,10 +412,22 @@ async def _data_costo_combustible(year: int, month: int):
     vehicles = state_store.get_vehicles()
     rows, total_lts_g, total_imp_g = [], 0.0, 0.0
 
+    # Meses pasados: los registros ya no viven en memoria (state_store solo
+    # carga el mes actual al arrancar), así que se consultan directo en MySQL.
+    is_current_month = (year == today.year and month == today.month)
+    fuel_by_vehicle: dict[str, list[dict]] = {}
+    if not is_current_month:
+        try:
+            month_records = await db_service.get_fuel_records_by_month(year, month)
+        except Exception:
+            month_records = []
+        for r in month_records:
+            fuel_by_vehicle.setdefault(str(r.get("vehicle_id", "")), []).append(r)
+
     for v in vehicles:
         vid = str(v.get("ras_vei_id", ""))
         eco = v.get("ras_vei_eco") or v.get("ras_vei_placa") or vid
-        all_fuel   = state_store.get_fuel_records_for_vehicle(vid)
+        all_fuel   = state_store.get_fuel_records_for_vehicle(vid) if is_current_month else fuel_by_vehicle.get(vid, [])
         month_recs = [r for r in all_fuel if _in_month(r, year, month)]
         met = state_store.get_unit_metrics(vid) if (year == today.year and month == today.month) else {}
         if not met:
