@@ -35,7 +35,18 @@ async def get_fuel_records_by_month(year: int, month: int) -> list[dict]:
                 WHERE YEAR(fecha) = %s AND MONTH(fecha) = %s
                 ORDER BY fecha ASC
             """, (year, month))
-            return await cur.fetchall()
+            rows = await cur.fetchall()
+            # MySQL devuelve las columnas DECIMAL como Decimal, no float.
+            # Se convierten aquí para que ningún cálculo aguas abajo truene
+            # al mezclar Decimal con float (ej. litros * precio_por_litro).
+            for r in rows:
+                if r.get("liters") is not None:
+                    r["liters"] = float(r["liters"])
+                if r.get("price_per_liter") is not None:
+                    r["price_per_liter"] = float(r["price_per_liter"])
+                if r.get("odometro_actual") is not None:
+                    r["odometro_actual"] = float(r["odometro_actual"])
+            return rows
     finally:
         conn.close()
 
