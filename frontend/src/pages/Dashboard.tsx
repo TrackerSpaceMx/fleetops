@@ -66,7 +66,6 @@ export function Dashboard() {
   const [showAllFuel, setShowAllFuel]         = useState(false);
   const [comparativo, setComparativo]         = useState<any[]>([]);
   const [comparativoLoading, setComparativoLoading] = useState(true);
-  const [consumoMode, setConsumoMode]         = useState<'litros' | 'costo'>('litros');
 
   // ── Datos derivados ───────────────────────────────────────────────────────
   const top3Units = [...fleetStats.units]
@@ -430,9 +429,13 @@ export function Dashboard() {
 
         {/* Estado de la Flota — carga por unidad hoy (BÁSCULA REAL) */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-2">
             <h3 className="text-lg font-bold text-gray-900">Estado de la Flota</h3>
-            <button className="text-sm text-blue-500 font-medium hover:text-blue-600">Ver mapa</button>
+          </div>
+          <div className="flex items-center gap-4 mb-4 text-[11px] text-gray-500">
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-success inline-block" /> Activo (GPS reciente)</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-warning inline-block" /> Inactivo</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-danger inline-block" /> Sin señal GPS</span>
           </div>
 
           {porUnidad.length > 0 ? (
@@ -440,38 +443,88 @@ export function Dashboard() {
             <div className="grid grid-cols-5 gap-2">
               {fleetStats.units.length > 0
                 ? /* Usar datos de flota + enriquecer con báscula */
-                  fleetStats.units.map((unit) => {
-                    const basData = porUnidad.find(
-                      p => p.num_eco.replace('-','').toUpperCase() === unit.eco.replace('-','').toUpperCase()
+                  (() => {
+                    const maxTons = Math.max(
+                      1,
+                      ...fleetStats.units.map((unit) => {
+                        const bd = porUnidad.find(
+                          p => p.num_eco.replace('-','').toUpperCase() === unit.eco.replace('-','').toUpperCase()
+                        );
+                        return bd?.toneladas ?? unit.toneladas_hoy ?? 0;
+                      })
                     );
-                    const tons = basData?.toneladas ?? unit.toneladas_hoy ?? 0;
-                    const statusColor =
-                      unit.status === 'ACTIVO'   ? 'bg-success' :
-                      unit.status === 'INACTIVO'  ? 'bg-warning' : 'bg-danger';
-                    return (
-                      <div
-                        key={unit.vehicle_id}
-                        className="aspect-square rounded-lg border border-gray-200 flex flex-col items-center justify-center p-1 hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group relative"
-                        title={`${unit.eco} — ${tons.toFixed(1)}t cargadas hoy`}
-                      >
-                        <div className={`absolute top-1 right-1 w-2 h-2 rounded-full ${statusColor}`} />
-                        <span className="text-xs font-bold text-gray-700 group-hover:text-blue-600">{unit.eco}</span>
-                        <span className="text-[10px] text-gray-400 font-mono mt-0.5">
-                          {tons > 0 ? `${tons.toFixed(1)}t` : '—'}
-                        </span>
-                      </div>
-                    );
-                  })
+                    return fleetStats.units.map((unit) => {
+                      const basData = porUnidad.find(
+                        p => p.num_eco.replace('-','').toUpperCase() === unit.eco.replace('-','').toUpperCase()
+                      );
+                      const tons = basData?.toneladas ?? unit.toneladas_hoy ?? 0;
+                      const statusColor =
+                        unit.status === 'ACTIVO'   ? 'bg-success' :
+                        unit.status === 'INACTIVO'  ? 'bg-warning' : 'bg-danger';
+                      const pct = Math.min(tons / maxTons, 1);
+                      const ringColor = pct > 0.66 ? '#10B981' : pct > 0.33 ? '#0A7AFF' : '#F59E0B';
+                      const circumference = 2 * Math.PI * 14;
+                      return (
+                        <div
+                          key={unit.vehicle_id}
+                          className="aspect-square rounded-lg border border-gray-200 flex flex-col items-center justify-center p-1 hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group relative"
+                          title={`${unit.eco} — ${tons.toFixed(1)}t cargadas hoy`}
+                        >
+                          <div className={`absolute top-1 right-1 w-2 h-2 rounded-full ${statusColor}`} />
+                          <div className="relative w-8 h-8">
+                            <svg className="w-8 h-8 -rotate-90" viewBox="0 0 32 32">
+                              <circle cx="16" cy="16" r="14" fill="none" stroke="#E5E7EB" strokeWidth="3" />
+                              {tons > 0 && (
+                                <circle
+                                  cx="16" cy="16" r="14" fill="none" stroke={ringColor} strokeWidth="3"
+                                  strokeDasharray={`${circumference * pct} ${circumference}`}
+                                  strokeLinecap="round"
+                                  className="transition-all duration-500"
+                                />
+                              )}
+                            </svg>
+                            <Truck className="w-3.5 h-3.5 text-gray-500 absolute inset-0 m-auto group-hover:text-blue-600" />
+                          </div>
+                          <span className="text-[11px] font-bold text-gray-700 group-hover:text-blue-600 mt-0.5">{unit.eco}</span>
+                          <span className="text-[10px] text-gray-400 font-mono">
+                            {tons > 0 ? `${tons.toFixed(1)}t` : '—'}
+                          </span>
+                        </div>
+                      );
+                    });
+                  })()
                 : /* Si aún no hay datos de flota, mostrar solo báscula */
-                  porUnidad.map((u) => (
-                    <div
-                      key={u.num_eco}
-                      className="aspect-square rounded-lg border border-gray-200 flex flex-col items-center justify-center p-1 hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group"
-                    >
-                      <span className="text-xs font-bold text-gray-700 group-hover:text-blue-600">{u.num_eco}</span>
-                      <span className="text-[10px] text-gray-400 font-mono mt-0.5">{u.toneladas.toFixed(1)}t</span>
-                    </div>
-                  ))
+                  (() => {
+                    const maxTons = Math.max(1, ...porUnidad.map(u => u.toneladas));
+                    return porUnidad.map((u) => {
+                      const pct = Math.min(u.toneladas / maxTons, 1);
+                      const ringColor = pct > 0.66 ? '#10B981' : pct > 0.33 ? '#0A7AFF' : '#F59E0B';
+                      const circumference = 2 * Math.PI * 14;
+                      return (
+                        <div
+                          key={u.num_eco}
+                          className="aspect-square rounded-lg border border-gray-200 flex flex-col items-center justify-center p-1 hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group"
+                        >
+                          <div className="relative w-8 h-8">
+                            <svg className="w-8 h-8 -rotate-90" viewBox="0 0 32 32">
+                              <circle cx="16" cy="16" r="14" fill="none" stroke="#E5E7EB" strokeWidth="3" />
+                              {u.toneladas > 0 && (
+                                <circle
+                                  cx="16" cy="16" r="14" fill="none" stroke={ringColor} strokeWidth="3"
+                                  strokeDasharray={`${circumference * pct} ${circumference}`}
+                                  strokeLinecap="round"
+                                  className="transition-all duration-500"
+                                />
+                              )}
+                            </svg>
+                            <Truck className="w-3.5 h-3.5 text-gray-500 absolute inset-0 m-auto group-hover:text-blue-600" />
+                          </div>
+                          <span className="text-[11px] font-bold text-gray-700 group-hover:text-blue-600 mt-0.5">{u.num_eco}</span>
+                          <span className="text-[10px] text-gray-400 font-mono">{u.toneladas.toFixed(1)}t</span>
+                        </div>
+                      );
+                    });
+                  })()
               }
             </div>
           ) : (
@@ -487,8 +540,9 @@ export function Dashboard() {
                     className="aspect-square rounded-lg border border-gray-200 flex flex-col items-center justify-center p-1 hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group relative"
                   >
                     <div className={`absolute top-1 right-1 w-2 h-2 rounded-full ${statusColor}`} />
-                    <span className="text-xs font-bold text-gray-700 group-hover:text-blue-600">{unit.eco}</span>
-                    <span className="text-[10px] text-gray-400 font-mono mt-0.5">—</span>
+                    <Truck className="w-4 h-4 text-gray-400 group-hover:text-blue-600" />
+                    <span className="text-[11px] font-bold text-gray-700 group-hover:text-blue-600 mt-0.5">{unit.eco}</span>
+                    <span className="text-[10px] text-gray-400 font-mono">—</span>
                   </div>
                 );
               })}
@@ -500,20 +554,7 @@ export function Dashboard() {
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-bold text-gray-900">Consumo (Top 3)</h3>
-            <div className="bg-gray-100 p-1 rounded-lg flex text-xs font-medium">
-              <button
-                onClick={() => setConsumoMode('litros')}
-                className={`px-3 py-1 rounded-md transition-colors ${consumoMode === 'litros' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
-              >
-                Litros
-              </button>
-              <button
-                onClick={() => setConsumoMode('costo')}
-                className={`px-3 py-1 rounded-md transition-colors ${consumoMode === 'costo' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
-              >
-                $ MXN
-              </button>
-            </div>
+            <span className="text-xs font-medium text-gray-400">Litros</span>
           </div>
           <div className="h-[250px] flex gap-2">
             {comparativoLoading ? (
@@ -545,13 +586,9 @@ export function Dashboard() {
                         <Tooltip
                           cursor={{ fill: '#F3F4F6' }}
                           contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
-                          formatter={(v: number) =>
-                            consumoMode === 'litros'
-                              ? [`${v.toLocaleString('es-MX')} L`, 'Litros']
-                              : [v.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' }), 'Costo']
-                          }
+                          formatter={(v: number) => [`${v.toLocaleString('es-MX')} L`, 'Litros']}
                         />
-                        <Bar dataKey={consumoMode === 'litros' ? 'litros' : 'costo'} radius={[4, 4, 0, 0]}>
+                        <Bar dataKey="litros" radius={[4, 4, 0, 0]}>
                           {mes.unidades.map((_: any, i: number) => (
                             <Cell key={i} fill={['#1A2B5E', '#0A7AFF', '#93C5FD'][i]} />
                           ))}
