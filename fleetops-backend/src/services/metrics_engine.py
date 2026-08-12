@@ -51,6 +51,8 @@ def _dias_habiles_mes(year: int, month: int) -> int:
 
 
 def _safe_div(numerator: float, denominator: float, default: float = 0.0) -> float:
+    numerator = float(numerator or 0)
+    denominator = float(denominator or 0)
     if denominator == 0:
         return default
     return round(numerator / denominator, 6)
