@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Scale, TrendingUp, TrendingDown, Truck, RefreshCw, Loader2 } from 'lucide-react';
+import { Scale, TrendingUp, TrendingDown, Truck, RefreshCw, Loader2, Search, X } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
 } from 'recharts';
@@ -56,6 +56,8 @@ export function Bascula() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [buscaUnidad, setBuscaUnidad] = useState('');
+  const [buscaActividad, setBuscaActividad] = useState('');
 
   const loadAll = useCallback(async () => {
     setError(null);
@@ -178,36 +180,73 @@ export function Bascula() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Por unidad */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <h3 className="text-sm font-bold text-gray-900 mb-4">Toneladas por unidad — hoy</h3>
-          <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
-            {porUnidad.length === 0 && (
-              <p className="text-sm text-gray-400">Sin registros de báscula hoy todavía.</p>
+          <h3 className="text-sm font-bold text-gray-900 mb-3">Toneladas por unidad — hoy</h3>
+          <div className="relative mb-4">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Buscar unidad..."
+              value={buscaUnidad}
+              onChange={(e) => setBuscaUnidad(e.target.value)}
+              className="w-full text-sm text-gray-700 placeholder-gray-400 bg-gray-50 border border-gray-100 rounded-lg pl-9 pr-8 py-2 outline-none focus:border-blue-300"
+            />
+            {buscaUnidad && (
+              <button onClick={() => setBuscaUnidad('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <X className="w-3.5 h-3.5" />
+              </button>
             )}
-            {porUnidad
-              .sort((a, b) => b.toneladas - a.toneladas)
-              .map((u) => {
-                const max = Math.max(...porUnidad.map((x) => x.toneladas), 1);
-                const pct = (u.toneladas / max) * 100;
-                return (
-                  <div key={u.num_eco}>
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="font-semibold text-gray-700 flex items-center gap-1.5">
-                        <Truck className="w-3.5 h-3.5 text-gray-400" /> {u.num_eco}
-                      </span>
-                      <span className="text-gray-500">{fmtNum(u.toneladas)} ton · {u.viajes} viajes</span>
+          </div>
+          <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+            {(() => {
+              const q = buscaUnidad.toLowerCase();
+              const filtradas = porUnidad.filter(u => !q || u.num_eco.toLowerCase().includes(q));
+              if (porUnidad.length === 0) {
+                return <p className="text-sm text-gray-400">Sin registros de báscula hoy todavía.</p>;
+              }
+              if (filtradas.length === 0) {
+                return <p className="text-sm text-gray-400">Sin unidades que coincidan con "{buscaUnidad}".</p>;
+              }
+              return filtradas
+                .sort((a, b) => b.toneladas - a.toneladas)
+                .map((u) => {
+                  const max = Math.max(...porUnidad.map((x) => x.toneladas), 1);
+                  const pct = (u.toneladas / max) * 100;
+                  return (
+                    <div key={u.num_eco}>
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="font-semibold text-gray-700 flex items-center gap-1.5">
+                          <Truck className="w-3.5 h-3.5 text-gray-400" /> {u.num_eco}
+                        </span>
+                        <span className="text-gray-500">{fmtNum(u.toneladas)} ton · {u.viajes} viajes</span>
+                      </div>
+                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }} />
+                      </div>
                     </div>
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                });
+            })()}
           </div>
         </div>
 
         {/* Actividad en vivo */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <h3 className="text-sm font-bold text-gray-900 mb-4">Actividad de báscula en vivo</h3>
+          <h3 className="text-sm font-bold text-gray-900 mb-3">Actividad de báscula en vivo</h3>
+          <div className="relative mb-4">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Buscar por unidad, cliente o tipo de residuo..."
+              value={buscaActividad}
+              onChange={(e) => setBuscaActividad(e.target.value)}
+              className="w-full text-sm text-gray-700 placeholder-gray-400 bg-gray-50 border border-gray-100 rounded-lg pl-9 pr-8 py-2 outline-none focus:border-blue-300"
+            />
+            {buscaActividad && (
+              <button onClick={() => setBuscaActividad('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
           <div className="overflow-y-auto max-h-80">
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-white">
@@ -219,17 +258,29 @@ export function Bascula() {
                 </tr>
               </thead>
               <tbody>
-                {actividad.length === 0 && (
-                  <tr><td colSpan={4} className="text-center text-gray-400 py-6">Sin actividad reciente.</td></tr>
-                )}
-                {actividad.map((r, i) => (
-                  <tr key={`${r.folio}-${i}`} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="py-2 font-semibold text-gray-700">{r.num_eco || r.placa}</td>
-                    <td className="py-2 text-gray-500 truncate max-w-[140px]">{r.tipo_cliente}</td>
-                    <td className="py-2 text-right font-mono text-gray-700">{fmtNum(r.peso_neto)}</td>
-                    <td className="py-2 text-right text-gray-400 font-mono">{r.hora_salida || r.hora_entrada}</td>
-                  </tr>
-                ))}
+                {(() => {
+                  const q = buscaActividad.toLowerCase();
+                  const filtrada = actividad.filter(r =>
+                    !q ||
+                    (r.num_eco || r.placa || '').toLowerCase().includes(q) ||
+                    (r.tipo_cliente || '').toLowerCase().includes(q) ||
+                    (r.tipo_residuo || '').toLowerCase().includes(q)
+                  );
+                  if (actividad.length === 0) {
+                    return <tr><td colSpan={4} className="text-center text-gray-400 py-6">Sin actividad reciente.</td></tr>;
+                  }
+                  if (filtrada.length === 0) {
+                    return <tr><td colSpan={4} className="text-center text-gray-400 py-6">Sin resultados para "{buscaActividad}".</td></tr>;
+                  }
+                  return filtrada.map((r, i) => (
+                    <tr key={`${r.folio}-${i}`} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="py-2 font-semibold text-gray-700">{r.num_eco || r.placa}</td>
+                      <td className="py-2 text-gray-500 truncate max-w-[140px]">{r.tipo_cliente}</td>
+                      <td className="py-2 text-right font-mono text-gray-700">{fmtNum(r.peso_neto)}</td>
+                      <td className="py-2 text-right text-gray-400 font-mono">{r.hora_salida || r.hora_entrada}</td>
+                    </tr>
+                  ));
+                })()}
               </tbody>
             </table>
           </div>

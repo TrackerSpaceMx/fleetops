@@ -23,6 +23,10 @@ import {
   type BascularRecord,
 } from '@/services/websocket';
 import { authFetch } from '../lib/auth';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { Download, ChevronDown } from 'lucide-react';
 
 const MESES_NOMBRE = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
@@ -54,6 +58,79 @@ export function Dashboard() {
   const [busqueda, setBusqueda]               = useState<string>('');
   const [pagina, setPagina]                   = useState<number>(1);
   const FILAS_POR_PAGINA = 10;
+  const [exportOpen, setExportOpen]           = useState(false);
+
+  // Filtrado de báscula (compartido entre la tabla y la exportación)
+  const actividadFiltrada = React.useMemo(() => {
+    const q = busqueda.toLowerCase();
+    return actividad.filter(r =>
+      !q ||
+      (r.num_eco || r.placa || '').toLowerCase().includes(q) ||
+      (r.tipo_cliente || '').toLowerCase().includes(q) ||
+      (r.tipo_residuo || '').toLowerCase().includes(q)
+    );
+  }, [actividad, busqueda]);
+
+  const exportRows = React.useMemo(() => actividadFiltrada.map(r => ({
+    Folio: r.folio,
+    Unidad: r.num_eco || r.placa || '',
+    Cliente: r.tipo_cliente || '',
+    Entrada: r.hora_entrada || '',
+    Salida: r.hora_salida || '',
+    'Peso Neto (t)': r.peso_neto,
+    'Tipo Residuo': r.tipo_residuo || '',
+  })), [actividadFiltrada]);
+
+  const exportCSV = () => {
+    if (exportRows.length === 0) return;
+    const headers = Object.keys(exportRows[0]);
+    const csvLines = [
+      headers.join(','),
+      ...exportRows.map(row =>
+        headers.map(h => {
+          const v = String((row as any)[h] ?? '');
+          return v.includes(',') || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v;
+        }).join(',')
+      ),
+    ];
+    const blob = new Blob(['\uFEFF' + csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `actividad-bascula-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setExportOpen(false);
+  };
+
+  const exportExcel = () => {
+    if (exportRows.length === 0) return;
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Actividad Báscula');
+    XLSX.writeFile(wb, `actividad-bascula-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    setExportOpen(false);
+  };
+
+  const exportPDF = () => {
+    if (exportRows.length === 0) return;
+    const doc = new jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(14);
+    doc.text('Actividad de Báscula', 14, 15);
+    doc.setFontSize(9);
+    doc.setTextColor(120);
+    doc.text(`Generado: ${new Date().toLocaleString('es-MX')}`, 14, 21);
+    autoTable(doc, {
+      startY: 26,
+      head: [Object.keys(exportRows[0])],
+      body: exportRows.map(row => Object.values(row).map(v => String(v ?? ''))),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [10, 122, 255] },
+    });
+    doc.save(`actividad-bascula-${new Date().toISOString().slice(0, 10)}.pdf`);
+    setExportOpen(false);
+  };
+
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Estado combustible / flota ────────────────────────────────────────────
@@ -673,7 +750,25 @@ export function Dashboard() {
               <RefreshCw className={`w-4 h-4 ${actividadLoading ? 'animate-spin text-blue-500' : ''}`} />
               {actividadLoading ? 'Actualizando...' : 'Actualizar'}
             </button>
-            <button className="text-sm text-blue-500 font-medium hover:text-blue-600">Exportar CSV</button>
+            <div className="relative">
+              <button
+                onClick={() => setExportOpen(v => !v)}
+                disabled={exportRows.length === 0}
+                className="flex items-center gap-1.5 text-sm text-blue-500 font-medium hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Download className="w-4 h-4" /> Exportar <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+              {exportOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setExportOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-20">
+                    <button onClick={exportCSV} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">CSV</button>
+                    <button onClick={exportExcel} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Excel (.xlsx)</button>
+                    <button onClick={exportPDF} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">PDF</button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -701,13 +796,7 @@ export function Dashboard() {
             <p className="text-xs mt-1">Los registros aparecerán automáticamente cada minuto</p>
           </div>
         ) : (() => {
-          const q = busqueda.toLowerCase();
-          const filtrados = actividad.filter(r =>
-            !q ||
-            (r.num_eco || r.placa || '').toLowerCase().includes(q) ||
-            (r.tipo_cliente || '').toLowerCase().includes(q) ||
-            (r.tipo_residuo || '').toLowerCase().includes(q)
-          );
+          const filtrados = actividadFiltrada;
           const totalPaginas = Math.max(1, Math.ceil(filtrados.length / FILAS_POR_PAGINA));
           const paginaReal   = Math.min(pagina, totalPaginas);
           const filas        = filtrados.slice((paginaReal - 1) * FILAS_POR_PAGINA, paginaReal * FILAS_POR_PAGINA);

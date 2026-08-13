@@ -355,15 +355,6 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
 
   return (
     <div className="p-8 max-w-[1400px] mx-auto animate-fade-in-up">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
-        <span>Inicio</span>
-        <ChevronRight className="w-4 h-4" />
-        <span>Flota</span>
-        <ChevronRight className="w-4 h-4" />
-        <span className="text-gray-900 font-medium">{vehicleId || 'TM-04'}</span>
-      </div>
-
       {/* Tabs */}
       <div className="flex border-b border-gray-200 mb-6">
         {tabs.map((tab) => {
