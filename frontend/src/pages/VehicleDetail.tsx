@@ -6,6 +6,8 @@ import {
   Scale,
   Eye,
   ChevronRight,
+  ChevronDown,
+  Plus,
   X,
   FileText,
   Loader2,
@@ -136,7 +138,9 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
   const [ticketUrl, setTicketUrl]             = useState<string | null>(null);
   const [ticketLoading, setTicketLoading]     = useState(false);
   const [vehicleEcoMap, setVehicleEcoMap]     = useState<Record<string, string>>({});
-  const [fuelBusqueda, setFuelBusqueda]       = useState('');
+  const [allVehicles, setAllVehicles]         = useState<{ id: string; eco: string }[]>([]);
+  const [rendVehicles, setRendVehicles]       = useState<string[]>([]);
+  const MAX_REND_VEHICLES = 5;  const [fuelBusqueda, setFuelBusqueda]       = useState('');
   const [fuelPagina, setFuelPagina]           = useState(1);
   const FUEL_FILAS = 10;
 
@@ -184,15 +188,25 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
         // El endpoint puede devolver el array directo o dentro de una propiedad
         const vehicles: any[] = Array.isArray(data) ? data : (data.vehicles ?? data.units ?? []);
         const map: Record<string, string> = {};
+        const list: { id: string; eco: string }[] = [];
         vehicles.forEach((v: any) => {
           const id = String(v.ras_vei_id ?? v.vehicle_id ?? '');
           const eco = v.ras_vei_eco || v.ras_vei_placa || id;
-          if (id) map[id] = eco;
+          if (id) {
+            map[id] = eco;
+            list.push({ id, eco });
+          }
         });
         setVehicleEcoMap(map);
+        setAllVehicles(list.sort((a, b) => a.eco.localeCompare(b.eco, 'es', { numeric: true })));
       })
       .catch(() => {});
   }, []);
+
+  // La unidad actual (de la URL) siempre empieza seleccionada en el comparador
+  useEffect(() => {
+    if (vehicleId) setRendVehicles([vehicleId]);
+  }, [vehicleId]);
 
   // ── Cargar historial de combustible (pestaña Combustible) ─────────────────
   useEffect(() => {
@@ -222,20 +236,26 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
       .finally(() => setFuelLoading(false));
   }, [activeTab, vehicleId]);
 
-  // ── Rendimiento histórico: últimos 3 meses para este vehículo ────────────
+  // ── Rendimiento histórico: últimos 3 meses, una o varias unidades ────────
   useEffect(() => {
-    if (activeTab !== 'operatividad' || !vehicleId) return;
+    if (activeTab !== 'operatividad' || rendVehicles.length === 0) return;
     setRendimientoLoading(true);
 
-    authFetch(`${API}/api/fleet/rendimiento-historico/${encodeURIComponent(vehicleId)}`)
-      .then(r => r.json())
-      .then(data => {
-        // Espera: { meses: [{ periodo, year, month, toneladas, km_total, km_prod, km_trasl, km_por_litro, diesel_lts }] }
-        setRendimientoMeses(data.meses ?? []);
-      })
-      .catch(() => setRendimientoMeses([]))
+    Promise.all(
+      rendVehicles.map((vid) =>
+        authFetch(`${API}/api/fleet/rendimiento-historico/${encodeURIComponent(vid)}`)
+          .then(r => r.json())
+          .then(data => {
+            const eco = vehicleEcoMap[vid] || vid;
+            const meses = data.meses ?? [];
+            return meses.map((m: any) => ({ ...m, unidad: eco, unidadId: vid }));
+          })
+          .catch(() => [])
+      )
+    )
+      .then((resultados) => setRendimientoMeses(resultados.flat()))
       .finally(() => setRendimientoLoading(false));
-  }, [activeTab, vehicleId]);
+  }, [activeTab, rendVehicles, vehicleEcoMap]);
 
   // ── Gráfica multi-vehículo: todos los vehículos del mes actual ────────────
   useEffect(() => {
@@ -370,12 +390,66 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
           {activeTab === 'operatividad' && (
             <motion.div key="operatividad" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }} className="space-y-6">
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                <div className="p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
                   <h3 className="text-lg font-bold text-gray-900">Rendimiento Mensual</h3>
                   <span className="text-xs text-gray-400 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
                     Últimos 3 meses
                   </span>
                 </div>
+
+                {/* Selector de unidades a comparar (máx. 5) */}
+                <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap items-center gap-2 bg-gray-50/50">
+                  <span className="text-xs font-semibold text-gray-500 mr-1">Unidades:</span>
+                  {rendVehicles.map((vid, idx) => (
+                    <span
+                      key={vid}
+                      className="flex items-center gap-1.5 text-xs font-semibold pl-2.5 pr-1.5 py-1 rounded-full border"
+                      style={{
+                        color: VEHICLE_COLORS[idx % VEHICLE_COLORS.length],
+                        borderColor: VEHICLE_COLORS[idx % VEHICLE_COLORS.length] + '55',
+                        backgroundColor: VEHICLE_COLORS[idx % VEHICLE_COLORS.length] + '14',
+                      }}
+                    >
+                      {vehicleEcoMap[vid] || vid}
+                      {rendVehicles.length > 1 && (
+                        <button
+                          onClick={() => setRendVehicles(prev => prev.filter(v => v !== vid))}
+                          className="hover:opacity-70"
+                          title="Quitar"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </span>
+                  ))}
+
+                  {rendVehicles.length < MAX_REND_VEHICLES && allVehicles.length > 0 && (
+                    <div className="relative group">
+                      <button className="flex items-center gap-1 text-xs font-semibold text-blue-600 border border-dashed border-blue-300 rounded-full pl-2 pr-2.5 py-1 hover:bg-blue-50 transition-colors">
+                        <Plus className="w-3 h-3" /> Agregar unidad <ChevronDown className="w-3 h-3" />
+                      </button>
+                      <div className="absolute left-0 top-full mt-1 w-48 max-h-64 overflow-y-auto bg-white rounded-lg shadow-lg border border-gray-100 py-1 hidden group-hover:block z-20">
+                        {allVehicles
+                          .filter(v => !rendVehicles.includes(v.id))
+                          .map(v => (
+                            <button
+                              key={v.id}
+                              onClick={() => setRendVehicles(prev =>
+                                prev.length < MAX_REND_VEHICLES ? [...prev, v.id] : prev
+                              )}
+                              className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                            >
+                              {v.eco}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                  {rendVehicles.length >= MAX_REND_VEHICLES && (
+                    <span className="text-[11px] text-gray-400">Máximo {MAX_REND_VEHICLES} unidades</span>
+                  )}
+                </div>
+
                 <div className="overflow-x-auto">
                   {rendimientoLoading ? (
                     <div className="flex items-center justify-center py-16 gap-3 text-gray-400">
@@ -392,6 +466,9 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                          {rendVehicles.length > 1 && (
+                            <th className="px-6 py-4 font-semibold">Unidad</th>
+                          )}
                           <th className="px-6 py-4 font-semibold">Mes</th>
                           <th className="px-6 py-4 font-semibold text-right">Toneladas</th>
                           <th className="px-6 py-4 font-semibold text-right">KM Prod</th>
@@ -409,8 +486,23 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
                             : rend < 1.5   ? 'text-red-500'
                             : rend < 1.8   ? 'text-yellow-500'
                             : 'text-blue-600';
+                          const colorIdx = rendVehicles.indexOf(row.unidadId);
                           return (
-                            <tr key={row.periodo} className="hover:bg-gray-50">
+                            <tr key={`${row.unidadId}-${row.periodo}`} className="hover:bg-gray-50">
+                              {rendVehicles.length > 1 && (
+                                <td className="px-6 py-4 font-sans">
+                                  <span
+                                    className="inline-flex items-center gap-1.5 font-semibold"
+                                    style={{ color: VEHICLE_COLORS[colorIdx % VEHICLE_COLORS.length] }}
+                                  >
+                                    <span
+                                      className="w-2 h-2 rounded-full inline-block"
+                                      style={{ backgroundColor: VEHICLE_COLORS[colorIdx % VEHICLE_COLORS.length] }}
+                                    />
+                                    {row.unidad}
+                                  </span>
+                                </td>
+                              )}
                               <td className="px-6 py-4 font-sans font-medium text-gray-900 capitalize">
                                 {row.periodo}
                               </td>
