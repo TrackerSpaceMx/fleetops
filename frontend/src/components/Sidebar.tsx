@@ -62,7 +62,7 @@ export function Sidebar({ activePage, setActivePage, collapsed, onToggleCollapse
     id: 'configuracion',
     label: 'Configuración',
     icon: Settings
-  }];
+  }].filter((item) => item.id !== 'configuracion' || user?.rol === 'admin');
 
   return (
     <aside className={`${collapsed ? 'w-20' : 'w-64'} bg-navy-500 h-screen flex flex-col fixed left-0 top-0 text-white shadow-xl z-20 transition-all duration-200`}>

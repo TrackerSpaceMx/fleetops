@@ -139,3 +139,31 @@ async def set_user_password(user_id: str, password_hash: str) -> None:
             )
     finally:
         conn.close()
+
+
+async def delete_user(user_id: str) -> None:
+    conn = await get_connection()
+    try:
+        async with conn.cursor() as cur:
+            await cur.execute("DELETE FROM usuarios WHERE id = %s", (user_id,))
+    finally:
+        conn.close()
+
+
+async def update_user(user_id: str, nombre: str | None = None, username: str | None = None) -> None:
+    conn = await get_connection()
+    try:
+        sets, params = [], []
+        if nombre is not None:
+            sets.append("nombre = %s")
+            params.append(nombre)
+        if username is not None:
+            sets.append("username = %s")
+            params.append(username)
+        if not sets:
+            return
+        params.append(user_id)
+        async with conn.cursor() as cur:
+            await cur.execute(f"UPDATE usuarios SET {', '.join(sets)} WHERE id = %s", params)
+    finally:
+        conn.close()

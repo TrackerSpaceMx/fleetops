@@ -54,6 +54,15 @@ class SetRolBody(BaseModel):
     rol: str
 
 
+class UpdateUserBody(BaseModel):
+    nombre: str | None = Field(default=None, min_length=2, max_length=120)
+    username: str | None = Field(default=None, min_length=3, max_length=64)
+
+
+class AdminSetPasswordBody(BaseModel):
+    password_nueva: str = Field(min_length=8, max_length=128)
+
+
 # ── Endpoints públicos ────────────────────────────────────────────────────────
 
 @router.post("/login")
@@ -147,4 +156,46 @@ async def set_user_rol(user_id: str, body: SetRolBody, admin=Depends(require_adm
     if not target:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     await user_service.set_user_role(user_id, body.rol)
+    return {"ok": True}
+
+
+@router.patch("/users/{user_id}")
+async def update_user(user_id: str, body: UpdateUserBody, _admin=Depends(require_admin)):
+    target = await user_service.get_user_by_id(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    if body.username is not None:
+        if not USERNAME_RE.match(body.username):
+            raise HTTPException(status_code=400, detail="Usuario inválido: usa solo letras, números, '.' o '_' (3-64 caracteres)")
+        existing = await user_service.get_user_by_username(body.username.strip())
+        if existing and existing["id"] != user_id:
+            raise HTTPException(status_code=409, detail="Ese nombre de usuario ya existe")
+
+    await user_service.update_user(
+        user_id,
+        nombre=body.nombre.strip() if body.nombre is not None else None,
+        username=body.username.strip() if body.username is not None else None,
+    )
+    return {"ok": True}
+
+
+@router.patch("/users/{user_id}/password")
+async def admin_set_password(user_id: str, body: AdminSetPasswordBody, _admin=Depends(require_admin)):
+    """Un administrador resetea la contraseña de otro usuario, sin necesitar la actual."""
+    target = await user_service.get_user_by_id(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    await user_service.set_user_password(user_id, hash_password(body.password_nueva))
+    return {"ok": True}
+
+
+@router.delete("/users/{user_id}")
+async def delete_user(user_id: str, admin=Depends(require_admin)):
+    if user_id == admin["id"]:
+        raise HTTPException(status_code=400, detail="No puedes eliminar tu propio usuario")
+    target = await user_service.get_user_by_id(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    await user_service.delete_user(user_id)
     return {"ok": True}
