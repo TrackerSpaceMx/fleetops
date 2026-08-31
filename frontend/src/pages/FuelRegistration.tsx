@@ -147,6 +147,7 @@ export function FuelRegistration() {
           conductor:       formData.conductor,
           proveedor:       formData.proveedor,
           tipo:            formData.tipo,
+          fecha:           new Date(formData.fecha).toISOString(),
           liters:          parseFloat(formData.litros),
           price_per_liter: parseFloat(formData.precio),
           odometro_actual: parseFloat(formData.odometro),
