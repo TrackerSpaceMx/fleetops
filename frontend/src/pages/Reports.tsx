@@ -388,8 +388,13 @@ export default function Reports() {
         rows = data[selectedReport.dataKey] ?? []
       } else if (selectedId === 'comparativo') {
         rows = Object.values(data.comparativo ?? {}).map((v: any) => ({
-          periodo: v.periodo, km_total: v.total_km, litros: v.total_litros,
-          km_por_litro: v.km_por_litro, toneladas: v.total_toneladas,
+          periodo: v.periodo,
+          km_total: v.promedio_km_rutas,
+          litros: v.consumo_combustible_lts,
+          km_por_litro: v.consumo_combustible_lts > 0
+            ? Math.round((v.promedio_km_rutas / v.consumo_combustible_lts) * 1000) / 1000
+            : 0,
+          toneladas: v.toneladas_mes,
         }))
       }
       const cols = (showDetail && selectedReport.supportsDetail && data[selectedReport.detailKey ?? '']?.length)
