@@ -166,6 +166,12 @@ async def add_fuel_record(record: dict) -> dict:
         _state["fuel_records"].append(full_record)
         return full_record
 
+async def load_fuel_records(records: list[dict]) -> None:
+    """Carga masiva de fuel_records desde MySQL (usado al arrancar el servicio)."""
+    async with _lock:
+        _state["fuel_records"] = records
+        logger.info("✓ %d fuel_records cargados a memoria desde MySQL", len(records))
+
 
 async def set_dashboard_summary(summary: dict) -> None:
     async with _lock:

@@ -137,6 +137,17 @@ async def _task_sync_bascula_mes():
         logger.error("Error en task sync_bascula_mes: %s", exc, exc_info=True)
 
 
+async def _task_load_fuel_records():
+    """Carga fuel_records del mes actual desde MySQL a memoria (al arrancar)."""
+    logger.info("▶ task: load_fuel_records")
+    try:
+        today = date.today()
+        records = await db_service.get_fuel_records_by_month(today.year, today.month)
+        await state_store.load_fuel_records(records)
+    except Exception as exc:
+        logger.error("Error en task load_fuel_records: %s", exc, exc_info=True)
+
+
 async def _task_load_vehicles():
     logger.info("▶ task: load_vehicles")
     
@@ -151,6 +162,7 @@ async def _task_load_vehicles():
             logger.info("  → vehículo: %s", v)
         await _task_refresh_km()
         await _task_refresh_km_historico()
+        await _task_load_fuel_records()
         # Cargar histórico de báscula del mes actual al arrancar
         await _task_sync_bascula_mes()
     else:
