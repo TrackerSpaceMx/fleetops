@@ -267,30 +267,34 @@ def build_fleet_payload() -> dict:
     }
 
 
-async def refresh_km_historico():
+async def refresh_km_historico(meses_forzados: list[tuple[int, int]] | None = None):
     """
     Calcula KM de los últimos 3 meses para todos los vehículos usando
     ODÓMETRO: hace 2 peticiones por vehículo por mes (día 1 y último día).
     km_total = odómetro_fin - odómetro_inicio
     Persiste en km_odometro_snapshots y monthly_km.
     Se ejecuta una vez al día (scheduler) y al arrancar.
+
+    meses_forzados: lista opcional de (year, month) para recalcular meses
+    específicos (backfill manual). Si no se pasa, usa "últimos 3 meses".
     """
     from calendar import monthrange
     from datetime import date
     from src.database import db_service
-
     today = date.today()
     vehicles = state_store.get_vehicles()
-
-    # Últimos 3 meses (sin el mes actual para no pisar datos en curso)
-    meses = []
-    for i in range(1, 4):
-        m = today.month - i
-        y = today.year
-        if m <= 0:
-            m += 12
-            y -= 1
-        meses.append((y, m))
+    if meses_forzados is not None:
+        meses = meses_forzados
+    else:
+        # Últimos 3 meses (sin el mes actual para no pisar datos en curso)
+        meses = []
+        for i in range(1, 4):
+            m = today.month - i
+            y = today.year
+            if m <= 0:
+                m += 12
+                y -= 1
+            meses.append((y, m))
 
     logger.info("refresh_km_historico: %d meses × %d vehículos", len(meses), len(vehicles))
 
@@ -357,10 +361,22 @@ async def refresh_km_historico():
                 await asyncio.sleep(1.5)   # pausa entre batches
 
         # Calcular km_total = fin - inicio y guardar en monthly_km
+        # Toneladas reales del mes desde báscula (agrupadas por eco)
+        toneladas_por_eco: dict[str, float] = {}
+        try:
+            bascula_rows = await db_service.get_bascula_monthly_by_eco(year, month)
+            for row in bascula_rows:
+                key = (row.get("num_eco") or "").replace("-", "").upper()
+                toneladas_por_eco[key] = toneladas_por_eco.get(key, 0.0) + row.get("toneladas", 0.0)
+        except Exception as e:
+            logger.warning("No se pudieron obtener toneladas de báscula para %d/%d: %s", month, year, e)
+
         all_metrics = []
         for v in vehicles:
             vid  = str(v.get("ras_vei_id", ""))
             eco  = v.get("ras_vei_eco") or v.get("ras_vei_placa") or vid
+            eco_key = eco.replace("-", "").upper()
+            toneladas_mes = round(toneladas_por_eco.get(eco_key, 0.0), 3)
             snap = snapshots_existentes.get(vid, {})
             km_inicio = snap.get("inicio")
             km_fin    = snap.get("fin")
@@ -378,8 +394,13 @@ async def refresh_km_historico():
             await state_store.set_km_historico(vid, year, month, km_total)
 
             # Litros de ese mes
-            fuel_records = state_store.get_fuel_records_for_vehicle(vid)
+            # Litros de ese mes (memoria si es mes actual, MySQL si es histórico)
             from src.routes.fuel_routes import _record_in_month
+            if year == today.year and month == today.month:
+                fuel_records = state_store.get_fuel_records_for_vehicle(vid)
+            else:
+                fuel_records = await db_service.get_fuel_records_by_month(year, month)
+                fuel_records = [r for r in fuel_records if str(r.get("vehicle_id")) == vid]
             month_recs = [r for r in fuel_records if _record_in_month(r, year, month)]
             litros = sum(r.get("liters", 0) for r in month_recs)
 
@@ -392,7 +413,7 @@ async def refresh_km_historico():
                 eco=eco,
                 km_total=km_total,
                 horas_operativas=horas,
-                toneladas=0.0,
+                toneladas=toneladas_mes,
                 litros_cargados=litros,
                 year=year,
                 month=month,
