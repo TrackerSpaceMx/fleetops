@@ -119,6 +119,7 @@ async def register_fuel_load(body: FuelLoadRequest):
         "vehicle_id": body.vehicle_id,
         "eco":        met.get("eco", body.vehicle_id),
         "record":     record,
+        "records":    state_store.get_state()["fuel_records"],
         "resumen":    _fuel_summary(body.vehicle_id, fuel_records),
         "ts":         datetime.now(CST).isoformat(),
     })
@@ -177,6 +178,7 @@ async def _post_fuel_background(body: FuelLoadRequest, record: dict):
         "vehicle_id": body.vehicle_id,
         "eco":        met.get("eco", body.vehicle_id),
         "record":     record,
+        "records":    state_store.get_state()["fuel_records"],
         "resumen":    _fuel_summary(body.vehicle_id, fuel_records),
         "ts":         datetime.now(CST).isoformat(),
     })
