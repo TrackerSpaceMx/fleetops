@@ -30,10 +30,11 @@ def _parse_fulltrack_datetime(dt_str: str) -> datetime | None:
 
 def _unit_status(event: dict) -> str:
     """
-    Determina el estado de la unidad:
-      ACTIVO   → GPS reportó hace menos de INACTIVITY_MINUTES min
-      INACTIVO → sin comunicación reciente
-      SIN_GPS  → no hay datos
+    Determina el estado de la unidad según minutos desde la última comunicación GPS:
+      ACTIVO    → 0-60 min
+      INACTIVO  → 60-120 min
+      SIN_SENAL → más de 120 min
+      SIN_GPS   → nunca ha reportado
     """
     gps_str = (
         event.get("ras_eve_data_gps")
@@ -46,9 +47,12 @@ def _unit_status(event: dict) -> str:
     diff = (datetime.utcnow() - dt).total_seconds() / 60
     # Fulltrack usa hora local MX (UTC-6), ajustamos
     diff -= 360  # compensar UTC+6 → puede quedar negativo si el reporte es reciente
-    if abs(diff) <= INACTIVITY_MINUTES:
+    diff = abs(diff)
+    if diff <= INACTIVITY_MINUTES:
         return "ACTIVO"
-    return "INACTIVO"
+    if diff <= INACTIVITY_MINUTES * 2:
+        return "INACTIVO"
+    return "SIN_SENAL"
 
 
 async def refresh_fleet_status() -> list[dict]:
