@@ -672,7 +672,8 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
                         <table className="w-full text-left border-collapse">
                           <thead>
                             <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                              <th className="px-6 py-4 font-semibold">Fecha</th>
+                              <th className="px-6 py-4 font-semibold">Fecha Evento</th>
+                              <th className="px-6 py-4 font-semibold">Registrado</th>
                               <th className="px-6 py-4 font-semibold">Placa</th>
                               <th className="px-6 py-4 font-semibold text-right">Litros</th>
                               <th className="px-6 py-4 font-semibold text-right">Precio/Lt</th>
@@ -685,7 +686,7 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
                           <tbody className="divide-y divide-gray-100 text-sm">
                             {filas.length === 0 ? (
                               <tr>
-                                <td colSpan={8} className="px-6 py-10 text-center text-gray-400 text-sm">
+                                  <td colSpan={9} className="px-6 py-10 text-center text-gray-400 text-sm">
                                   Sin resultados para "{fuelBusqueda}"
                                 </td>
                               </tr>
@@ -695,6 +696,7 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
                               return (
                                 <tr key={row.id ?? i} className="hover:bg-gray-50">
                                   <td className="px-6 py-4 text-gray-600">{formatFecha(row.fecha ?? row.created_at)}</td>
+                                  <td className="px-6 py-4 text-gray-400">{formatFecha(row.created_at)}</td>
                                   <td className="px-6 py-4">
                                     <span className="font-mono text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
                                       {vehicleEcoMap[String(row.vehicle_id)] || row.vehicle_id || '—'}
@@ -912,7 +914,7 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
                           <tbody className="divide-y divide-gray-100 text-sm">
                             {filas.length === 0 ? (
                               <tr>
-                                <td colSpan={8} className="px-6 py-10 text-center text-gray-400 text-sm">
+                                <td colSpan={9} className="px-6 py-10 text-center text-gray-400 text-sm">
                                   Sin resultados para "{basculaBusqueda}"
                                 </td>
                               </tr>
