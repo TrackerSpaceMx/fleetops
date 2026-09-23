@@ -20,6 +20,7 @@ export type FleetUnit = {
   // báscula
   toneladas_hoy: number;
   status: string;
+  gps_date: string;
 };
 
 export type FuelStats = {
@@ -143,6 +144,7 @@ export const connectFleetSocket = (
             total_importe: u.total_importe ?? 0,
             toneladas_hoy: u.toneladas     ?? 0,   // ← viene de state_store, actualizado por báscula
             status:        u.status        ?? 'SIN_GPS',
+            gps_date:      u.gps_date      ?? '',
           }))
           .sort((a: FleetUnit, b: FleetUnit) => b.km_por_litro - a.km_por_litro);
 

@@ -510,9 +510,9 @@ export function Dashboard() {
             <h3 className="text-lg font-bold text-gray-900">Estado de la Flota</h3>
           </div>
           <div className="flex items-center gap-4 mb-4 text-[11px] text-gray-500">
-            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-success inline-block" /> Activo (GPS reciente)</span>
-            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-warning inline-block" /> Inactivo</span>
-            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-danger inline-block" /> Sin señal GPS</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-success inline-block" /> Activo (0-60 min)</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-warning inline-block" /> Inactivo (60-120 min)</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-danger inline-block" /> Sin señal GPS (+120 min)</span>
           </div>
 
           {porUnidad.length > 0 ? (
@@ -538,6 +538,16 @@ export function Dashboard() {
                       const statusColor =
                         unit.status === 'ACTIVO'   ? 'bg-success' :
                         unit.status === 'INACTIVO'  ? 'bg-warning' : 'bg-danger';
+                      const statusLabel =
+                        unit.status === 'ACTIVO'    ? 'Activo' :
+                        unit.status === 'INACTIVO'  ? 'Inactivo (60-120 min sin GPS)' :
+                        unit.status === 'SIN_SENAL' ? 'Sin señal GPS (+120 min)' :
+                        'Sin señal GPS (nunca reportó)';
+                      const gpsLabel = unit.gps_date
+                        ? new Date(unit.gps_date).toLocaleString('es-MX', {
+                            day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+                          })
+                        : 'Sin dato';
                       const pct = Math.min(tons / maxTons, 1);
                       const ringColor = pct > 0.66 ? '#10B981' : pct > 0.33 ? '#0A7AFF' : '#F59E0B';
                       const circumference = 2 * Math.PI * 14;
@@ -545,7 +555,7 @@ export function Dashboard() {
                         <div
                           key={unit.vehicle_id}
                           className="aspect-square rounded-lg border border-gray-200 flex flex-col items-center justify-center p-1 hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group relative"
-                          title={`${unit.eco} — ${tons.toFixed(1)}t cargadas hoy`}
+                          title={`${unit.eco} — ${statusLabel}\n${tons.toFixed(1)}t cargadas hoy\nÚltima comunicación GPS: ${gpsLabel}`}
                         >
                           <div className={`absolute top-1 right-1 w-2 h-2 rounded-full ${statusColor}`} />
                           <div className="relative w-8 h-8">
