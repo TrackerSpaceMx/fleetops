@@ -44,9 +44,8 @@ def _unit_status(event: dict) -> str:
     dt = _parse_fulltrack_datetime(gps_str)
     if dt is None:
         return "SIN_GPS"
+    # Fulltrack manda timestamps en UTC-0, sin conversión necesaria
     diff = (datetime.utcnow() - dt).total_seconds() / 60
-    # Fulltrack usa hora local MX (UTC-6), ajustamos
-    diff -= 360  # compensar UTC+6 → puede quedar negativo si el reporte es reciente
     diff = abs(diff)
     if diff <= INACTIVITY_MINUTES:
         return "ACTIVO"
@@ -78,12 +77,16 @@ async def refresh_fleet_status() -> list[dict]:
         vid = str(ev.get("ras_vei_id") or ev.get("vehicle_id") or "")
         vehicle_info = id_to_eco.get(vid, {})
 
-        gps_date = (
+        gps_date_raw = (
             ev.get("ras_eve_data_gps")
             or ev.get("ras_ras_data_ult_comunicacao")
             or ""
         )
         status = _unit_status(ev)
+        gps_dt = _parse_fulltrack_datetime(gps_date_raw)
+        # Convertir a ISO 8601 (con sufijo Z, ya que Fulltrack manda UTC-0)
+        # para que el frontend lo parsee correctamente con new Date()
+        gps_date = gps_dt.isoformat() + "Z" if gps_dt else ""
 
         enriched = {
             "vehicle_id":   vid,
