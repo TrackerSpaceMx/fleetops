@@ -712,12 +712,15 @@ export function Dashboard() {
                       <span className="text-gray-500 font-normal">{fuel.conductor}</span>
                     </p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      Evento: {new Date((fuel.fecha ?? fuel.created_at) + 'Z').toLocaleString('es-MX', {
+                        Evento: {new Date((() => {
+                        const v = fuel.fecha ?? fuel.created_at;
+                        return v.endsWith('Z') ? v : v + 'Z';
+                      })()).toLocaleString('es-MX', {
                         day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
                       })}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      Registrado: {new Date(fuel.created_at + 'Z').toLocaleString('es-MX', {
+                      Registrado: {new Date(fuel.created_at.endsWith('Z') ? fuel.created_at : fuel.created_at + 'Z').toLocaleString('es-MX', {
                         day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
                       })}
                     </p>
