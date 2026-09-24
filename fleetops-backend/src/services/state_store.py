@@ -166,6 +166,25 @@ async def add_fuel_record(record: dict) -> dict:
         _state["fuel_records"].append(full_record)
         return full_record
 
+async def update_fuel_record(record_id: str, fields: dict) -> dict | None:
+    """Actualiza un fuel_record en memoria. Retorna el registro actualizado o None si no existe."""
+    async with _lock:
+        for r in _state["fuel_records"]:
+            if str(r.get("id")) == str(record_id):
+                r.update(fields)
+                return r
+        return None
+
+
+async def delete_fuel_record(record_id: str) -> bool:
+    """Elimina un fuel_record de memoria. Retorna True si existía."""
+    async with _lock:
+        before = len(_state["fuel_records"])
+        _state["fuel_records"] = [
+            r for r in _state["fuel_records"] if str(r.get("id")) != str(record_id)
+        ]
+        return len(_state["fuel_records"]) < before
+
 async def load_fuel_records(records: list[dict]) -> None:
     """Carga masiva de fuel_records desde MySQL (usado al arrancar el servicio)."""
     async with _lock:

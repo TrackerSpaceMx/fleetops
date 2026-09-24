@@ -26,6 +26,36 @@ async def save_fuel_record(record: dict) -> None:
     finally:
         conn.close()
 
+async def update_fuel_record(record_id: str, fields: dict) -> bool:
+    """Actualiza campos específicos de un fuel_record. Retorna True si afectó una fila."""
+    if not fields:
+        return False
+    conn = await get_connection()
+    try:
+        async with conn.cursor() as cur:
+            set_clause = ", ".join(f"{k} = %({k})s" for k in fields.keys())
+            params = {**fields, "id": record_id}
+            await cur.execute(
+                f"UPDATE fuel_records SET {set_clause} WHERE id = %(id)s",
+                params
+            )
+            return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+async def delete_fuel_record(record_id: str) -> bool:
+    """Elimina un fuel_record por id. Retorna True si eliminó una fila."""
+    conn = await get_connection()
+    try:
+        async with conn.cursor() as cur:
+            await cur.execute("DELETE FROM fuel_records WHERE id = %s", (record_id,))
+            return cur.rowcount > 0
+    finally:
+        conn.close()
+
+        
+
 async def get_fuel_records_by_month(year: int, month: int) -> list[dict]:
     conn = await get_connection()
     try:

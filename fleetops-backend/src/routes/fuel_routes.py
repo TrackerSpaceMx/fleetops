@@ -140,6 +140,94 @@ async def register_fuel_load(body: FuelLoadRequest):
 
     return {"status": "ok", "record": record}
 
+class FuelUpdateRequest(BaseModel):
+    conductor:       str | None = None
+    proveedor:       str | None = None
+    tipo:            Literal["DIESEL", "GASOLINA_COMUN", "GASOLINA_PREMIUM"] | None = None
+    fecha:           datetime | None = None
+    odometro_actual: float | None = None
+    liters:          float | None = Field(default=None, gt=0)
+    price_per_liter: float | None = Field(default=None, gt=0)
+    tanque_lleno:    bool | None = None
+
+
+@router.put("/{record_id}")
+async def update_fuel_load(record_id: str, body: FuelUpdateRequest):
+    """Edita un registro de combustible existente (parcial: solo los campos enviados)."""
+    logger = logging.getLogger(__name__)
+    fields = {k: v for k, v in body.model_dump().items() if v is not None}
+
+    if not fields:
+        raise HTTPException(status_code=400, detail="No se enviaron campos para actualizar.")
+
+    # ── 1. Actualizar en memoria ────────────────────────────────────────────
+    updated = await state_store.update_fuel_record(record_id, fields)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Registro no encontrado.")
+
+    # ── 2. Actualizar en MySQL ───────────────────────────────────────────────
+    try:
+        await db_service.update_fuel_record(record_id, fields)
+    except Exception as e:
+        logger.error("Error actualizando fuel_record %s en MySQL: %s", record_id, e)
+        raise HTTPException(status_code=500, detail="Error al guardar en base de datos.")
+
+    # ── 3. Recalcular métricas y emitir WS ──────────────────────────────────
+    await fleet_service.recalculate_all_metrics()
+    vehicle_id = updated.get("vehicle_id")
+    fuel_records = state_store.get_fuel_records_for_vehicle(vehicle_id)
+    met = state_store.get_unit_metrics(vehicle_id)
+    await ws_manager.broadcast_fuel({
+        "type":       "fuel_update",
+        "vehicle_id": vehicle_id,
+        "eco":        met.get("eco", vehicle_id),
+        "record":     updated,
+        "records":    state_store.get_state()["fuel_records"],
+        "resumen":    _fuel_summary(vehicle_id, fuel_records),
+        "ts":         datetime.now(CST).isoformat(),
+    })
+
+    return {"status": "ok", "record": updated}
+
+
+@router.delete("/{record_id}")
+async def delete_fuel_load(record_id: str):
+    """Elimina un registro de combustible."""
+    logger = logging.getLogger(__name__)
+
+    # Buscar el registro antes de borrarlo (para saber vehicle_id y recalcular después)
+    all_records = state_store.get_state()["fuel_records"]
+    record = next((r for r in all_records if str(r.get("id")) == str(record_id)), None)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Registro no encontrado.")
+    vehicle_id = record.get("vehicle_id")
+
+    # ── 1. Eliminar de memoria ───────────────────────────────────────────────
+    await state_store.delete_fuel_record(record_id)
+
+    # ── 2. Eliminar de MySQL ──────────────────────────────────────────────────
+    try:
+        await db_service.delete_fuel_record(record_id)
+    except Exception as e:
+        logger.error("Error eliminando fuel_record %s en MySQL: %s", record_id, e)
+        raise HTTPException(status_code=500, detail="Error al eliminar en base de datos.")
+
+    # ── 3. Recalcular métricas y emitir WS ──────────────────────────────────
+    await fleet_service.recalculate_all_metrics()
+    fuel_records = state_store.get_fuel_records_for_vehicle(vehicle_id)
+    met = state_store.get_unit_metrics(vehicle_id)
+    await ws_manager.broadcast_fuel({
+        "type":       "fuel_deleted",
+        "vehicle_id": vehicle_id,
+        "eco":        met.get("eco", vehicle_id),
+        "record_id":  record_id,
+        "records":    state_store.get_state()["fuel_records"],
+        "resumen":    _fuel_summary(vehicle_id, fuel_records),
+        "ts":         datetime.now(CST).isoformat(),
+    })
+
+    return {"status": "ok", "deleted_id": record_id}
+
 
 async def _post_fuel_background(body: FuelLoadRequest, record: dict):
     """Snapshot de odómetro en Fulltrack + recálculo de métricas en background."""

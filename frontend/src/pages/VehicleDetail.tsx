@@ -12,6 +12,8 @@ import {
   FileText,
   Loader2,
   RefreshCw,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { authFetch } from '../lib/auth';
 import {
@@ -99,6 +101,187 @@ function TicketModal({ url, onClose }: { url: string; onClose: () => void }) {
   );
 }
 
+// ── Modal: editar carga de combustible ────────────────────────────────────────
+function EditFuelModal({
+  form, setForm, onSave, onClose, saving, errorMsg,
+}: {
+  form: any;
+  setForm: (f: any) => void;
+  onSave: () => void;
+  onClose: () => void;
+  saving: boolean;
+  errorMsg: string;
+}) {
+  const set = (k: string, v: any) => setForm({ ...form, [k]: v });
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+          <h3 className="font-bold text-gray-900 flex items-center gap-2">
+            <Pencil className="w-4 h-4 text-blue-500" />
+            Editar Carga de Combustible
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1">Fecha del evento</label>
+            <input
+              type="date"
+              value={form.fecha ?? ''}
+              onChange={(e) => set('fecha', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1">Conductor</label>
+            <input
+              type="text"
+              value={form.conductor ?? ''}
+              onChange={(e) => set('conductor', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1">Proveedor</label>
+            <input
+              type="text"
+              value={form.proveedor ?? ''}
+              onChange={(e) => set('proveedor', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1">Tipo de combustible</label>
+            <select
+              value={form.tipo ?? 'DIESEL'}
+              onChange={(e) => set('tipo', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+            >
+              <option value="DIESEL">Diesel</option>
+              <option value="GASOLINA_COMUN">Gasolina Común</option>
+              <option value="GASOLINA_PREMIUM">Gasolina Premium</option>
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Litros</label>
+              <input
+                type="number" step="0.01"
+                value={form.liters ?? ''}
+                onChange={(e) => set('liters', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Precio/Lt</label>
+              <input
+                type="number" step="0.01"
+                value={form.price_per_liter ?? ''}
+                onChange={(e) => set('price_per_liter', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1">Odómetro (km)</label>
+            <input
+              type="number" step="1"
+              value={form.odometro_actual ?? ''}
+              onChange={(e) => set('odometro_actual', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono"
+            />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={!!form.tanque_lleno}
+              onChange={(e) => set('tanque_lleno', e.target.checked)}
+              className="rounded border-gray-300"
+            />
+            Tanque lleno
+          </label>
+          {errorMsg && (
+            <p className="text-sm text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{errorMsg}</p>
+          )}
+        </div>
+        <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onSave}
+            disabled={saving}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium text-sm hover:bg-blue-600 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+          >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            Guardar cambios
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// ── Modal: confirmar eliminación de carga ─────────────────────────────────────
+function DeleteFuelModal({
+  record, onConfirm, onClose, deleting,
+}: {
+  record: any;
+  onConfirm: () => void;
+  onClose: () => void;
+  deleting: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-white rounded-xl shadow-xl max-w-sm w-full overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-5">
+          <h3 className="font-bold text-gray-900 mb-2">¿Eliminar esta carga?</h3>
+          <p className="text-sm text-gray-500">
+            Se eliminará el registro de <strong>{record.liters} L</strong> del{' '}
+            <strong>{record.conductor || 'operador desconocido'}</strong>. Esta acción no se puede deshacer.
+          </p>
+        </div>
+        <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={deleting}
+            className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={deleting}
+            className="px-4 py-2 bg-red-500 text-white rounded-lg font-medium text-sm hover:bg-red-600 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+          >
+            {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
+            Eliminar
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ── Tooltip personalizado para la gráfica multi-vehículo ─────────────────────
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
@@ -135,6 +318,12 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
   const [fuelRecords, setFuelRecords]         = useState<any[]>([]);
   const [fuelLoading, setFuelLoading]         = useState(false);
   const [fuelError, setFuelError]             = useState('');
+  const [editingRecord, setEditingRecord]     = useState<any | null>(null);
+  const [editForm, setEditForm]               = useState<any>({});
+  const [editSaving, setEditSaving]           = useState(false);
+  const [editErrorMsg, setEditErrorMsg]       = useState('');
+  const [deletingRecord, setDeletingRecord]   = useState<any | null>(null);
+  const [deleting, setDeleting]               = useState(false);
   const [ticketUrl, setTicketUrl]             = useState<string | null>(null);
   const [ticketLoading, setTicketLoading]     = useState(false);
   const [vehicleEcoMap, setVehicleEcoMap]     = useState<Record<string, string>>({});
@@ -177,6 +366,73 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
       setTicketUrl(rawUrl);
     } finally {
       setTicketLoading(false);
+    }
+  };
+
+  const openEdit = (row: any) => {
+    setEditForm({
+      conductor:       row.conductor ?? '',
+      proveedor:       row.proveedor ?? '',
+      tipo:            row.tipo ?? 'DIESEL',
+      fecha:           (row.fecha ?? row.created_at ?? '').slice(0, 10),
+      odometro_actual: row.odometro_actual ?? '',
+      liters:          row.liters ?? '',
+      price_per_liter: row.price_per_liter ?? '',
+      tanque_lleno:    !!row.tanque_lleno,
+    });
+    setEditErrorMsg('');
+    setEditingRecord(row);
+  };
+
+  const saveEdit = async () => {
+    if (!editingRecord) return;
+    setEditSaving(true);
+    setEditErrorMsg('');
+    try {
+      const body = {
+        conductor:       editForm.conductor,
+        proveedor:       editForm.proveedor,
+        tipo:            editForm.tipo,
+        fecha:           editForm.fecha ? new Date(editForm.fecha).toISOString() : undefined,
+        odometro_actual: editForm.odometro_actual !== '' ? parseFloat(editForm.odometro_actual) : undefined,
+        liters:          editForm.liters !== '' ? parseFloat(editForm.liters) : undefined,
+        price_per_liter: editForm.price_per_liter !== '' ? parseFloat(editForm.price_per_liter) : undefined,
+        tanque_lleno:    editForm.tanque_lleno,
+      };
+      const res = await authFetch(`${API}/api/fuel/${editingRecord.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setFuelRecords(prev => prev.map(r => r.id === editingRecord.id ? data.record : r));
+      setEditingRecord(null);
+    } catch (e: any) {
+      setEditErrorMsg(e.message || 'No se pudo guardar el cambio.');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingRecord) return;
+    setDeleting(true);
+    try {
+      const res = await authFetch(`${API}/api/fuel/${deletingRecord.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      setFuelRecords(prev => prev.filter(r => r.id !== deletingRecord.id));
+      setDeletingRecord(null);
+    } catch (e: any) {
+      alert(e.message || 'No se pudo eliminar el registro.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -681,12 +937,13 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
                               <th className="px-6 py-4 font-semibold text-right">Odómetro</th>
                               <th className="px-6 py-4 font-semibold">Operador</th>
                               <th className="px-6 py-4 font-semibold text-center">Ticket</th>
+                              <th className="px-6 py-4 font-semibold text-center">Acciones</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100 text-sm">
                             {filas.length === 0 ? (
                               <tr>
-                                  <td colSpan={9} className="px-6 py-10 text-center text-gray-400 text-sm">
+                                  <td colSpan={10} className="px-6 py-10 text-center text-gray-400 text-sm">
                                   Sin resultados para "{fuelBusqueda}"
                                 </td>
                               </tr>
@@ -727,6 +984,24 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
                                         <Eye className="w-5 h-5" />
                                       </span>
                                     )}
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <div className="flex items-center justify-center gap-3">
+                                      <button
+                                        onClick={() => openEdit(row)}
+                                        className="text-gray-400 hover:text-blue-600 transition-colors"
+                                        title="Editar carga"
+                                      >
+                                        <Pencil className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        onClick={() => setDeletingRecord(row)}
+                                        className="text-gray-400 hover:text-red-600 transition-colors"
+                                        title="Eliminar carga"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
                                   </td>
                                 </tr>
                               );
@@ -1020,6 +1295,32 @@ export function VehicleDetail({ vehicleId, onNavigate }: {
       <AnimatePresence>
         {ticketUrl && (
           <TicketModal url={ticketUrl} onClose={() => setTicketUrl(null)} />
+        )}
+      </AnimatePresence>
+
+      {/* Modal editar carga */}
+      <AnimatePresence>
+        {editingRecord && (
+          <EditFuelModal
+            form={editForm}
+            setForm={setEditForm}
+            onSave={saveEdit}
+            onClose={() => setEditingRecord(null)}
+            saving={editSaving}
+            errorMsg={editErrorMsg}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Modal confirmar eliminación */}
+      <AnimatePresence>
+        {deletingRecord && (
+          <DeleteFuelModal
+            record={deletingRecord}
+            onConfirm={confirmDelete}
+            onClose={() => setDeletingRecord(null)}
+            deleting={deleting}
+          />
         )}
       </AnimatePresence>
     </div>
