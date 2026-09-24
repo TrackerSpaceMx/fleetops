@@ -12,7 +12,11 @@ export function FuelRegistration() {
     conductor: '',
     proveedor: '',
     tipo: 'DIESEL',
-    fecha: new Date().toISOString().slice(0, 16),
+    fecha: (() => {
+      const d = new Date();
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      return d.toISOString().slice(0, 16);
+    })(),
     odometro: '',
     litros: '',
     precio: '',
@@ -164,7 +168,11 @@ export function FuelRegistration() {
         conductor: '',
         proveedor: '',
         tipo: 'DIESEL',
-        fecha: new Date().toISOString().slice(0, 16),
+        fecha: (() => {
+          const d = new Date();
+          d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+          return d.toISOString().slice(0, 16);
+        })(),
         odometro: '',
         litros: '',
         precio: '',

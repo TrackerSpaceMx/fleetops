@@ -160,7 +160,7 @@ async def add_fuel_record(record: dict) -> dict:
         record_id = f"fuel_{len(_state['fuel_records']) + 1}_{int(datetime.utcnow().timestamp())}"
         full_record = {
             "id": record_id,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.utcnow().isoformat() + "Z",
             **record,
         }
         _state["fuel_records"].append(full_record)
