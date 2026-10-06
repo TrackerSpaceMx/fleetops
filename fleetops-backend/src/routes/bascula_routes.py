@@ -102,8 +102,8 @@ def _normalize_api_record(r: dict) -> dict | None:
         # Ajuste de zona horaria: API en UTC-5 → CDMX (UTC-6) = restar 1 hora.
         # hora_entrada define la fecha del registro (si cruza medianoche al
         # restar, la fecha del registro se corrige junto con la hora).
-        fecha, hora_entrada = _shift_hour(fecha, r.get("hora_entrada", ""), -1)
-        _, hora_salida = _shift_hour(fecha, r.get("hora_salida", ""), -1)
+        fecha, hora_entrada = _shift_hour(fecha, r.get("hora_entrada", ""), 0)
+        _, hora_salida = _shift_hour(fecha, r.get("hora_salida", ""), 0)
 
         return {
             "folio":         r.get("folio"),

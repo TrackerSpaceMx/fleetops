@@ -124,6 +124,13 @@ const REPORT_GROUPS = [
 
 const ALL_REPORTS = REPORT_GROUPS.flatMap(g => g.reports)
 
+// Reportes de báscula: sus unidades (num_eco) no vienen del catálogo de flota
+// Fulltrack — incluyen vehículos propios y externos/subcontratados que pasan
+// por la báscula pero nunca tuvieron GPS. Para estos, el filtro de "Unidades"
+// debe poblarse desde los propios datos del reporte, no desde /api/fleet/vehicles,
+// o se pierden registros reales (ej. haulers externos, unidades sin GPS activo).
+const BASCULA_OWN_UNITS_REPORTS = ['bascula-mensual', 'bascula-actividad', 'tonelaje']
+
 const COLUMN_LABELS: Record<string, string> = {
   eco: 'No. Económico', num_eco: 'No. Económico',
   km_total: 'Km Total', km_por_litro: 'Km/Lt',
@@ -329,9 +336,15 @@ export default function Reports() {
   const [showDetail,  setShowDetail]  = useState(false)
 
   const selectedReport = ALL_REPORTS.find(r => r.id === selectedId) ?? ALL_REPORTS[0]
+  const usesOwnUnits = BASCULA_OWN_UNITS_REPORTS.includes(selectedId)
 
-  // Vehículos
+  // Vehículos — catálogo de flota Fulltrack (GPS). Para reportes de báscula
+  // (bascula-mensual, bascula-actividad, tonelaje) NO se usa este catálogo:
+  // hay vehículos externos/subcontratados o sin GPS que pasan por báscula y
+  // no están en /api/fleet/vehicles — usarlo aquí los excluye del reporte
+  // aunque sí existan en bascula_records.
   useEffect(() => {
+    if (usesOwnUnits) return
     authFetch(`${API_BASE}/api/fleet/vehicles`)
       .then(r => { if (!r.ok) throw new Error('404'); return r.json() })
       .then(data => {
@@ -340,20 +353,35 @@ export default function Reports() {
           .filter(Boolean).sort() as string[]
         if (ecos.length > 0) { setAllVehicles(ecos); setSelectedUnits(ecos) }
       }).catch(() => {})
-  }, [])
+  }, [usesOwnUnits])
 
   useEffect(() => {
-    if (allVehicles.length > 0 || previewData.length === 0) return
+    if ((!usesOwnUnits && allVehicles.length > 0) || previewData.length === 0) return
     const sample = previewData[0] as any
     const ecoKey = sample?.eco ? 'eco' : sample?.num_eco ? 'num_eco' : null
     if (!ecoKey) { setAllVehicles(['TODAS']); setSelectedUnits(['TODAS']); return }
     const ecos = [...new Set(previewData.map((r: any) => r[ecoKey]).filter(Boolean))].sort() as string[]
     setAllVehicles(ecos); setSelectedUnits(ecos)
-  }, [previewData, allVehicles.length])
+  }, [previewData, allVehicles.length, usesOwnUnits])
 
   // Construir query params según filtro
   const buildParams = useCallback(() => {
     const params = new URLSearchParams()
+    if (!selectedReport.supportsRange) {
+      // Reportes sin soporte de rango (ej. Tonelaje Mensual) siempre usan
+      // year/month — su endpoint ignora date_from/date_to y cae al mes
+      // actual si se los manda por error, sin importar qué modo de fecha
+      // esté activo en el filtro global.
+      if (filterMode === 'month') {
+        params.set('year',  String(selectedPeriod.year))
+        params.set('month', String(selectedPeriod.month))
+      } else {
+        const d = new Date(dateFrom)
+        params.set('year',  String(d.getFullYear()))
+        params.set('month', String(d.getMonth() + 1))
+      }
+      return params.toString()
+    }
     if (filterMode === 'month') {
       params.set('year',  String(selectedPeriod.year))
       params.set('month', String(selectedPeriod.month))
@@ -420,10 +448,15 @@ export default function Reports() {
   const toggleGroup = (g: string) =>
     setOpenGroups(prev => ({ ...prev, [g]: !prev[g] }))
 
+  const NO_UNIT_FILTER_REPORTS = ['comparativo', 'bascula-por-cliente', 'bascula-turno']
+
+  const normalizeEco = (s: string) => (s || '').toString().trim().toUpperCase().replace(/-0+(\d)/, '-$1')
   const filteredData = (() => {
+    if (NO_UNIT_FILTER_REPORTS.includes(selectedId)) return previewData
     if (!selectedUnits.length || selectedUnits.includes('TODAS')) return previewData
     const ecoKey = previewData[0]?.eco !== undefined ? 'eco' : 'num_eco'
-    return previewData.filter(r => selectedUnits.includes(r[ecoKey]))
+    const normalizedSelected = selectedUnits.map(normalizeEco)
+    return previewData.filter(r => normalizedSelected.includes(normalizeEco(r[ecoKey])))
   })()
 
   const activeCols = (showDetail && selectedReport.supportsDetail && filteredData[0] && selectedReport.detailColumns.length > 0)

@@ -343,11 +343,15 @@ async def upsert_bascula_records(records: list[dict]) -> int:
                     VALUES
                         (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
                     ON DUPLICATE KEY UPDATE
+                        placa        = VALUES(placa),
+                        num_eco      = VALUES(num_eco),
                         peso_entrada = VALUES(peso_entrada),
                         peso_salida  = VALUES(peso_salida),
                         peso_neto    = VALUES(peso_neto),
                         hora_entrada = VALUES(hora_entrada),
                         hora_salida  = VALUES(hora_salida),
+                        tipo_cliente = VALUES(tipo_cliente),
+                        tipo_residuo = VALUES(tipo_residuo),
                         fetched_at   = NOW()
                 """, (
                     r.get("folio"),
