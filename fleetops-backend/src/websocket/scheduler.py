@@ -164,7 +164,7 @@ async def _task_load_vehicles():
         await _task_refresh_km_historico()
         await _task_load_fuel_records()
         # Cargar histórico de báscula del mes actual al arrancar
-        await _task_sync_bascula_mes()
+        #await _task_sync_bascula_mes()
     else:
         logger.warning("No se obtuvieron vehículos de Fulltrack.")
 
