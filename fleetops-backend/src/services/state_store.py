@@ -188,7 +188,7 @@ async def delete_fuel_record(record_id: str) -> bool:
 async def load_fuel_records(records: list[dict]) -> None:
     """Carga masiva de fuel_records desde MySQL (usado al arrancar el servicio)."""
     async with _lock:
-        _state["fuel_records"] = records
+        _state["fuel_records"] = list(records)
         logger.info("✓ %d fuel_records cargados a memoria desde MySQL", len(records))
 
 

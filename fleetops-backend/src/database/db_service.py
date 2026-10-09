@@ -65,7 +65,7 @@ async def get_fuel_records_by_month(year: int, month: int) -> list[dict]:
                 WHERE YEAR(fecha) = %s AND MONTH(fecha) = %s
                 ORDER BY fecha ASC
             """, (year, month))
-            rows = await cur.fetchall()
+            rows = list(await cur.fetchall())
             # MySQL devuelve las columnas DECIMAL como Decimal, no float.
             # Se convierten aquí para que ningún cálculo aguas abajo truene
             # al mezclar Decimal con float (ej. litros * precio_por_litro).
